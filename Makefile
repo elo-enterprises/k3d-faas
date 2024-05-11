@@ -1,13 +1,23 @@
-##
+####################################################################################
 # Project automation.
 #
-# Typical usage: `make clean bootstrap build test`
-# 	`clean`: tears down the k3d cluster and all apps
-# 	`bootstrap`: bootstraps the k3d cluster and cluster-auth
-# 	`build`: deploy all apps to cluster
-# 	`clean`: tears down the cluster an all apps
+# USAGE: `make clean bootstrap build test`
+# 	- clean: tears down the k3d cluster and all apps
+# 	- bootstrap: bootstraps the k3d cluster and cluster-auth
+# 	- deploy: deploys all infrastructure and applications
+# 	- test: runs all infrastructure and application tests
 #
-##
+# NOTE: 
+#   This project uses k8s-tools.git automation to dispatch commands 
+#   into the containers described inside `k8s-tools.yml`. See the full 
+#   docs here[1].  Summarizing calling conventions: targets written like
+#   "▰/myservice/target_name" describe a callback so that container 
+#   "myservice" will run "make ↪target_name".
+#
+# REF:
+#   [1] https://github.com/elo-enterprises/k8s-tools#makefilecomposemk
+####################################################################################
+# BEGIN: Data and Macros
 SHELL := bash
 MAKEFLAGS += -s --warn-undefined-variables
 .SHELLFLAGS := -euo pipefail -c
@@ -18,24 +28,23 @@ SRC_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 PROJECT_ROOT := $(shell dirname ${THIS_MAKEFILE})
 export SRC_ROOT PROJECT_ROOT
 
+# always use a local profile, ignoring whatever is in the parent environment
+export KUBECONFIG:=./${CLUSTER_NAME}.profile.yaml
+
+# k3d cluster defaults, merged with whatever is in CLUSTER_CONFIG
 export CLUSTER_NAME?=faas
 export CLUSTER_AGENT_COUNT?=12
 export CLUSTER_CONFIG?=faas.cluster.k3d.yaml
-export KUBECONFIG:=./${CLUSTER_NAME}.profile.yaml
 
-#####################################################################
 
-# Creates dynamic targets from compose services.
-# See the docs at FIXME
+# Creates dynamic targets from compose services (See REF[1])
 include Makefile.compose.mk
 $(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/k8s-tools.yml))
 $(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/docker-compose.yml))
 
-bash: compose.bash
-shell: k8s-tools/base/shell
-k9s k9: k8s-tools/k9s
-panic: docker.panic
-
+# END: Data and Macros
+####################################################################################
+# BEGIN: cluster-ops
 
 project.show: ▰/kubectl/show
 ↪show:
@@ -55,6 +64,9 @@ deploy.apps: fission_app.setup knative_app.setup
 
 test: fission_infra.test fission_app.test knative_infra.test knative_app.test
 
+# END: top-level
+####################################################################################
+# BEGIN: cluster-ops
 this_cluster.bootstrap: ▰/k3d/this_cluster.setup ▰/k3d/this_cluster.auth
 this_cluster.clean: ▰/k3d/this_cluster.clean
 ↪this_cluster.clean:
@@ -72,11 +84,12 @@ this_cluster.clean: ▰/k3d/this_cluster.clean
 	rmdir $${KUBECONFIG} 2>/dev/null || rm -f $${KUBECONFIG}
 	k3d kubeconfig merge $${CLUSTER_NAME} --output $${KUBECONFIG}
 
-
-
+# END: cluster-ops
+####################################################################################
+# BEGIN: fission
 # https://fission.io/docs/installation/
 # https://fission.io/docs/reference/fission-cli/fission_token_create/
-#####################################################################
+
 export FISSION_NAMESPACE?=fission
 define FISSION_AUTH_TOKEN
 FISSION_AUTH_TOKEN=`\
@@ -113,9 +126,10 @@ fission_app.test: ▰/fission/fission_app.test
 	(fission function list | grep fission-app) \
 		|| fission function create --name fission-app --env python --code src/fission/app.py \
 	&& fission function test --timeout=0 --name fission-app
-
+# END: fission
+####################################################################################
+# BEGIN: knative
 # https://knative.run/article/How_to_deploy_a_Knative_function_on_Kubernetes.html
-#####################################################################
 knative_infra.setup: ▰/kubectl/knative_infra.setup
 knative_infra.test: ▰/kn/knative_infra.test
 ↪knative_infra.setup:
@@ -138,3 +152,15 @@ knative_app.setup: ▰/kn/knative_app.setup
 	echo app-placeholder
 ↪knative_app.test:
 	echo test-placeholder
+# END: knative
+####################################################################################
+# BEGIN: shortcuts and aliases
+bash: compose.bash
+shell: k8s-tools/base/shell
+k9: k9s
+panic: docker.panic
+docs:
+	pynchon jinja render README.md.j2
+
+# END: shortcuts and aliases
+####################################################################################

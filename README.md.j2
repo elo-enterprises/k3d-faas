@@ -11,25 +11,14 @@
     <td>
       Laboratory for working with Functions as a Service on kubernetes
       <br/><br/>
-      
+      {%for action in github.actions%}<a href="{{action.url}}"><img src="{{action.url}}/badge.svg"></a>{%endfor%}
     </td>
   </tr>
 </table>
 
 -------------------------------------------------------------
 
-<div class="toc">
-<ul>
-<li><a href="#overview">Overview</a></li>
-<li><a href="#features">Features</a></li>
-<li><a href="#quick-start">Quick Start</a><ul>
-<li><a href="#clonebuildtest-this-repo">Clone/Build/Test This Repo</a></li>
-</ul>
-</li>
-<li><a href="#known-limitations-and-issues">Known Limitations and Issues</a></li>
-</ul>
-</div>
-
+{{markdown_toc(__template__, level=4)}}
 
 -------------------------------------------------------------
 
@@ -48,10 +37,10 @@
 
 ```bash
 # for ssh
-$ git clone git@github.com:elo-enterprises/k3d-faas.git
+$ git clone {{github.repo_ssh_url}}
 
 # or for http
-$ git clone https://github.com/elo-enterprises/k3d-faas
+$ git clone {{github.repo_url}}
 
 # 
 $ make clean build test
