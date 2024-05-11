@@ -11,7 +11,7 @@
     <td>
       Laboratory for working with Functions as a Service on kubernetes
       <br/><br/>
-      
+      <a href="https://github.com/elo-enterprises/k3d-faas/actions/workflows/docker-test.yml"><img src="https://github.com/elo-enterprises/k3d-faas/actions/workflows/docker-test.yml/badge.svg"></a>
     </td>
   </tr>
 </table>
@@ -24,6 +24,7 @@
 <li><a href="#features">Features</a></li>
 <li><a href="#quick-start">Quick Start</a><ul>
 <li><a href="#clonebuildtest-this-repo">Clone/Build/Test This Repo</a></li>
+<li><a href="#clonebuildtest-this-repo_1">Clone/Build/Test This Repo</a></li>
 </ul>
 </li>
 <li><a href="#known-limitations-and-issues">Known Limitations and Issues</a></li>
@@ -35,10 +36,15 @@
 
 ## Overview
 
+Placeholder 
 
 -------------------------------------------------------------
 
 ## Features
+
+* E2E demo for basic [Fission](https://fission.io/docs) infrastructure & application deployment
+* E2E demo for basic [Knative](https://knative.dev/docs) infrastructure deployment *(app coming soon)*
+* Bundles Fission, Knative, & OpenWhisk CLI tools
 
 -------------------------------------------------------------
 
@@ -54,9 +60,14 @@ $ git clone git@github.com:elo-enterprises/k3d-faas.git
 $ git clone https://github.com/elo-enterprises/k3d-faas
 
 # 
-$ make clean build test
+$ make clean bootstrap deploy test
 ```
 
+### Clone/Build/Test This Repo
 -------------------------------------------------------------
 
 # Known Limitations and Issues
+
+1. Placeholder
+1. Placeholder
+1. Placeholder

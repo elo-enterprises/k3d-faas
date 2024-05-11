@@ -1,7 +1,7 @@
 ####################################################################################
 # Project automation.
 #
-# USAGE: `make clean bootstrap build test`
+# USAGE: `make clean bootstrap deploy test`
 # 	- clean: tears down the k3d cluster and all apps
 # 	- bootstrap: bootstraps the k3d cluster and cluster-auth
 # 	- deploy: deploys all infrastructure and applications
@@ -17,7 +17,8 @@
 # REF:
 #   [1] https://github.com/elo-enterprises/k8s-tools#makefilecomposemk
 ####################################################################################
-# BEGIN: Data and Macros
+
+# BEGIN: Data & Macros
 SHELL := bash
 MAKEFLAGS += -s --warn-undefined-variables
 .SHELLFLAGS := -euo pipefail -c
@@ -28,13 +29,13 @@ SRC_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 PROJECT_ROOT := $(shell dirname ${THIS_MAKEFILE})
 export SRC_ROOT PROJECT_ROOT
 
-# always use a local profile, ignoring whatever is in the parent environment
-export KUBECONFIG:=./${CLUSTER_NAME}.profile.yaml
-
 # k3d cluster defaults, merged with whatever is in CLUSTER_CONFIG
 export CLUSTER_NAME?=faas
 export CLUSTER_AGENT_COUNT?=12
 export CLUSTER_CONFIG?=faas.cluster.k3d.yaml
+
+# always use a local profile, ignoring whatever is in the parent environment
+export KUBECONFIG:=./${CLUSTER_NAME}.profile.yaml
 
 
 # Creates dynamic targets from compose services (See REF[1])
@@ -42,9 +43,9 @@ include Makefile.compose.mk
 $(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/k8s-tools.yml))
 $(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/docker-compose.yml))
 
-# END: Data and Macros
+# END: Data & Macros
 ####################################################################################
-# BEGIN: cluster-ops
+# BEGIN: Top-level:: These are the main entrypoints that you probably want.
 
 project.show: ▰/kubectl/show
 ↪show:
@@ -64,9 +65,10 @@ deploy.apps: fission_app.setup knative_app.setup
 
 test: fission_infra.test fission_app.test knative_infra.test knative_app.test
 
-# END: top-level
+# END: Top-level
 ####################################################################################
-# BEGIN: cluster-ops
+# BEGIN: Cluster-ops:: These targets use the `k3d` container
+
 this_cluster.bootstrap: ▰/k3d/this_cluster.setup ▰/k3d/this_cluster.auth
 this_cluster.clean: ▰/k3d/this_cluster.clean
 ↪this_cluster.clean:
@@ -84,35 +86,39 @@ this_cluster.clean: ▰/k3d/this_cluster.clean
 	rmdir $${KUBECONFIG} 2>/dev/null || rm -f $${KUBECONFIG}
 	k3d kubeconfig merge $${CLUSTER_NAME} --output $${KUBECONFIG}
 
-# END: cluster-ops
+# END: Cluster-ops
 ####################################################################################
-# BEGIN: fission
-# https://fission.io/docs/installation/
-# https://fission.io/docs/reference/fission-cli/fission_token_create/
+# BEGIN: Fission Infra/Apps :: 
+#   Infra uses `kubectl` container, but apps require the `fission` container for CLI
+#   - https://fission.io/docs/installation/
+#   - https://fission.io/docs/reference/fission-cli/fission_token_create/
 
 export FISSION_NAMESPACE?=fission
-define FISSION_AUTH_TOKEN
-FISSION_AUTH_TOKEN=`\
-		kubectl get secrets -n $${FISSION_NAMESPACE} -o json \
-		| jq -r '.items[]|select(.metadata.name|startswith("fission-router")).data.token' \
-		| base64 -d`
-endef
 fission_infra.setup: ▰/kubectl/fission_infra.setup compose.wait/30 project.show
+fission_infra.teardown: ▰/kubectl/fission_infra.teardown
+fission_infra.test: ▰/fission/fission_infra.test
+fission_infra.test: ▰/fission/fission_infra.test
 ↪fission_infra.setup:
 	kubectl create -k "github.com/fission/fission/crds/v1?ref=v1.20.1" || true
 	kubectl create namespace $${FISSION_NAMESPACE}
 	kubectl config set-context --current --namespace=$${FISSION_NAMESPACE}
 	kubectl apply -f https://github.com/fission/fission/releases/download/v1.20.1/fission-all-v1.20.1-minikube.yaml
 	kubectl config set-context --current --namespace=default
-# ↪fission_infra.auth: $(eval $(call FISSION_AUTH_TOKEN))
-fission_infra.teardown:
+↪fission_infra.teardown:
 	kubectl delete namespace --cascade=background $${FISSION_NAMESPACE} 2>/dev/null || true
-fission_infra.test: ▰/fission/fission_infra.test
 ↪fission_infra.test: #fission_infra.auth
 	fission version && echo "----------------------"
 	fission check && echo "----------------------"
 
-fission.test: ▰/fission/fission.test
+# FIXME: 
+# ↪fission_infra.auth: $(eval $(call FISSION_AUTH_TOKEN))
+# define FISSION_AUTH_TOKEN
+# FISSION_AUTH_TOKEN=`\
+# 		kubectl get secrets -n $${FISSION_NAMESPACE} -o json \
+# 		| jq -r '.items[]|select(.metadata.name|startswith("fission-router")).data.token' \
+# 		| base64 -d`
+# endef
+
 
 fission_app.setup: fission_infra.test
 fission_app.setup: ▰/fission/fission_app.deploy
@@ -126,10 +132,14 @@ fission_app.test: ▰/fission/fission_app.test
 	(fission function list | grep fission-app) \
 		|| fission function create --name fission-app --env python --code src/fission/app.py \
 	&& fission function test --timeout=0 --name fission-app
-# END: fission
+
+# END: Fission infra/apps
 ####################################################################################
-# BEGIN: knative
-# https://knative.run/article/How_to_deploy_a_Knative_function_on_Kubernetes.html
+# BEGIN: Knative Infra / Apps ::
+#   Dispatching to `kubectl` container and `kn` container for the the `kn` and `func` CLI
+#   - https://knative.run/article/How_to_deploy_a_Knative_function_on_Kubernetes.html
+#   - https://knative.dev/docs/getting-started/first-service/
+#   - https://knative.dev/docs/samples/
 knative_infra.setup: ▰/kubectl/knative_infra.setup
 knative_infra.test: ▰/kn/knative_infra.test
 ↪knative_infra.setup:
@@ -137,8 +147,8 @@ knative_infra.test: ▰/kn/knative_infra.test
 	kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.14.0/operator.yaml || true
 	make ↪knative_infra.serving
 ↪knative_infra.serving:
-	kubectl apply -f https://github.com/knative/serving/releases/download/v0.25.0/serving-crds.yaml
-	kubectl apply -f https://github.com/knative/serving/releases/download/v0.25.0/serving-core.yaml
+	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-crds.yaml
+	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-core.yaml
 ↪knative_infra.auth:
 	echo knative_infra.auth placeholder
 ↪knative_infra.test:
@@ -152,7 +162,8 @@ knative_app.setup: ▰/kn/knative_app.setup
 	echo app-placeholder
 ↪knative_app.test:
 	echo test-placeholder
-# END: knative
+
+# END: Knative infra/apps
 ####################################################################################
 # BEGIN: shortcuts and aliases
 bash: compose.bash
