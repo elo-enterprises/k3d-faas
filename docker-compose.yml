@@ -1,0 +1,21 @@
+services:
+  wsk: &wsk
+    image: openwhisk:cli
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM debian
+        RUN apt-get update
+        RUN apt-get install -y wget
+        # RUN git clone https://github.com/apache/openwhisk-cli
+        RUN mkdir -p /opt/whisk-cli
+        RUN cd /opt/whisk-cli && wget https://github.com/apache/openwhisk-cli/releases/download/1.2.0/OpenWhisk_CLI-1.2.0-linux-amd64.tgz
+        RUN cd /opt/whisk-cli && tar -zxvf OpenWhisk_CLI-1.2.0-linux-amd64.tgz
+        RUN cp /opt/whisk-cli/wsk /usr/local/bin
+    # build: https://github.com/alpine-docker/k8s.git#master:/
+    tty: true
+    entrypoint: wsk
+    network_mode: host
+    working_dir: /workspace
+    volumes:
+      - ${PWD}:/workspace
