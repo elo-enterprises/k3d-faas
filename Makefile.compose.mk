@@ -35,7 +35,7 @@
 export COLOR_GREEN:=\033[92m
 export NO_COLOR:=\033[0m
 export COLOR_DIM:=\033[2m
-COLOR_RED=\033[91m
+export COLOR_RED=\033[91m
 export COMPOSE_IGNORE_ORPHANS:=True
 export COMPOSE_MK?=0
 
@@ -131,8 +131,10 @@ ${relf}/%:
 		eval $${base} ; \
 	else \
 		cat /dev/stdin > "$${tmpf}" \
-		&& (printf "$${COLOR_GREEN}→ ($${svc_name}) $${COLOR_DIM}\n`cat "$${tmpf}|sed -e 's/COMPOSE_MK=1/'"`\n$${NO_COLOR}" >&2)  \
-		&& trap "rm $${tmpf}" EXIT \
+		&& (printf "$${COLOR_GREEN}→ ($${svc_name}) $${COLOR_DIM}\n`\
+				cat $${tmpf} | sed -e 's/COMPOSE_MK=1//' \
+			`\n$${NO_COLOR}" >&2)  \
+		&& trap "rm -f $${tmpf}" EXIT \
 		&& cat "$${tmpf}" | eval $${base} \
 	; fi
 $(foreach \
@@ -152,18 +154,29 @@ endef
 help:
 	@LC_ALL=C $(MAKE) -pRrq -f $(firstword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/(^|\n)# Files(\n|$$)/,/(^|\n)# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | grep -E -v -e '^[^[:alnum:]]' -e '^$@$$' || true
 
-delay/%:
-	sleep ${*}
 
 ## END: meta targets
 ########################################################################
 ## BEGIN: convenience targets (api-unstable: these might change)
 
+compose.wait/%:
+	printf "${COLOR_DIM}Waiting for ${*} seconds..${NO_COLOR}\n" > /dev/stderr \
+	&& sleep ${*}
+
+compose.init:
+	@# Ensure compose is available and build it
+	docker compose version >/dev/null \
+	&& make compose.build
+
 compose.build:
+	@#
 	docker compose build
 
 compose.clean:
+	@#
 	docker compose down --remove-orphans
+compose.bash:
+	env bash -l
 
 docker.init:
 	@# Check if docker is available, no real setup
