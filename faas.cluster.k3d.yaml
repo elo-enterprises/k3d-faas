@@ -1,0 +1,54 @@
+# k3d cluster create $${CLUSTER_NAME} \
+# --api-port 6550 --servers 1 --agents 3 \
+# --port 8080:80@loadbalancer \
+# --volume $${SAMPLE_DIR}/:/src@all \
+# --wait
+kind: Simple
+apiVersion: k3d.io/v1alpha3
+name: faas
+# servers: 3
+# agents: 2
+# kubeAPI:
+#   hostIP: 0.0.0.0
+#   hostPort: "6444"
+# image: rancher/k3s:v1.22.2-k3s1
+# volumes:
+# - volume: /tmp:/tmp/somepath
+#   nodeFilters:
+#   - all
+# ports:
+# - port: 8080:80
+#   nodeFilters:
+#   - loadbalancer
+# - port: 0.0.0.0:8443:443
+#   nodeFilters:
+#   - loadbalancer
+# options:
+#   k3d:
+#     wait: true
+#     timeout: 6m0s
+#     disableLoadbalancer: false
+#     disableImageVolume: false
+#     disableRollback: false
+#   k3s:
+#     extraArgs:
+#     - arg: --tls-san=127.0.0.1
+#       nodeFilters:
+#       - server:*
+#     nodeLabels: []
+#   kubeconfig:
+#     updateDefaultKubeconfig: true
+#     switchCurrentContext: true
+#   runtime:
+#     gpuRequest: ""
+#     serversMemory: ""
+#     agentsMemory: ""
+#     labels:
+#     - label: foo=bar
+#       nodeFilters:
+#       - server:0
+#       - loadbalancer
+# env:
+# - envVar: bar=baz
+#   nodeFilters:
+#   - all

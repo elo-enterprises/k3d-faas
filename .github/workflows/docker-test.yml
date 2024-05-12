@@ -1,0 +1,28 @@
+# See also: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Project Tests
+on:
+  workflow_call: {}
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+    paths-ignore:
+      - '**.md'
+      - '**.png'
+permissions:
+  contents: read
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Initialize
+        run: make clean
+      - name: Build
+        run: make bootstrap
+      - name: Integration Tests
+        run: make deploy
+      - name: Smoke Tests
+        run: make test
