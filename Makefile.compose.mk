@@ -194,5 +194,11 @@ k8s.create.namespace:
 		--dry-run=client -o yaml \
 	| kubectl apply -f -
 
+k8s.namespace.purge:
+	kubectl delete namespace --cascade=background $${namespace} 2>/dev/null || true
+k8s.namespace.list:
+	kubectl get namespaces -o json \
+	| jq -r '.items[].metadata.name'
+
 ## END: convenience targets
 ########################################################################

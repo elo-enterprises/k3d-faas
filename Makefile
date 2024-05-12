@@ -47,7 +47,7 @@ $(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/docker-compose.yml
 ####################################################################################
 # BEGIN: Top-level:: These are the main entrypoints that you probably want.
 
-project.show: ▰/kubectl/show
+project.show: ▰/base/show
 ↪show:
 	@#
 	echo CLUSTER_NAME=$${CLUSTER_NAME}
@@ -60,7 +60,7 @@ clean: this_cluster.clean compose.clean
 bootstrap: docker.init compose.init this_cluster.bootstrap project.show
 
 deploy: deploy.infra deploy.apps
-deploy.infra: fission_infra.setup knative_infra.setup
+deploy.infra: fission_infra.setup knative_infra.setup argo_infra.setup
 deploy.apps: fission_app.setup knative_app.setup
 
 test: fission_infra.test fission_app.test knative_infra.test knative_app.test
@@ -94,8 +94,8 @@ this_cluster.clean: ▰/k3d/this_cluster.clean
 #   - https://fission.io/docs/reference/fission-cli/fission_token_create/
 
 export FISSION_NAMESPACE?=fission
-fission_infra.setup: ▰/kubectl/fission_infra.setup compose.wait/30 project.show
-fission_infra.teardown: ▰/kubectl/fission_infra.teardown
+fission_infra.setup: ▰/base/fission_infra.setup compose.wait/30 project.show
+fission_infra.teardown: ▰/base/fission_infra.teardown
 fission_infra.test: ▰/fission/fission_infra.test
 fission_infra.test: ▰/fission/fission_infra.test
 ↪fission_infra.setup:
@@ -104,8 +104,8 @@ fission_infra.test: ▰/fission/fission_infra.test
 	kubectl config set-context --current --namespace=$${FISSION_NAMESPACE}
 	kubectl apply -f https://github.com/fission/fission/releases/download/v1.20.1/fission-all-v1.20.1-minikube.yaml
 	kubectl config set-context --current --namespace=default
-↪fission_infra.teardown:
-	kubectl delete namespace --cascade=background $${FISSION_NAMESPACE} 2>/dev/null || true
+↪fission_infra.teardown: 
+	namespace=$${FISSION_NAMESPACE} make k8s.namespace.purge 
 ↪fission_infra.test: #fission_infra.auth
 	fission version && echo "----------------------"
 	fission check && echo "----------------------"
@@ -140,8 +140,10 @@ fission_app.test: ▰/fission/fission_app.test
 #   - https://knative.run/article/How_to_deploy_a_Knative_function_on_Kubernetes.html
 #   - https://knative.dev/docs/getting-started/first-service/
 #   - https://knative.dev/docs/samples/
-knative_infra.setup: ▰/kubectl/knative_infra.setup
+export KNATIVE_NAMESPACE_PREFIX := knative-
+knative_infra.setup: ▰/base/knative_infra.setup
 knative_infra.test: ▰/kn/knative_infra.test
+knative_infra.teardown: ▰/base/knative_infra.teardown
 ↪knative_infra.setup:
 	kubectl create -f https://github.com/knative/operator/releases/download/knative-v1.5.1/operator-post-install.yaml || true
 	kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.14.0/operator.yaml || true
@@ -156,6 +158,11 @@ knative_infra.test: ▰/kn/knative_infra.test
 	kn version
 	kubectl get pods --namespace knative-serving
 	cd src/knf/; tree
+↪knative_infra.teardown: 
+	make k8s.namespace.list \
+	| grep $${KNATIVE_NAMESPACE_PREFIX} \
+	| xargs -n1 -I% bash -x -c "namespace=% make k8s.namespace.purge"
+
 knative_app.test: ▰/kn/knative_app.test
 knative_app.setup: ▰/kn/knative_app.setup
 ↪knative_app.setup:
@@ -175,3 +182,15 @@ docs:
 
 # END: shortcuts and aliases
 ####################################################################################
+# https://argoproj.github.io/argo-events/quick_start/
+export ARGO_NAMESPACE_PREFIX:=argo
+argo: argo_infra.teardown argo_infra.setup 
+argo_infra.setup: ▰/base/argo_infra.setup
+argo_infra.teardown: ▰/base/argo_infra.teardown
+↪argo_infra.teardown: 
+	make k8s.namespace.list 
+↪argo_infra.setup:
+	helm repo list |grep $${ARGO_NAMESPACE_PREFIX} || helm repo add argo https://argoproj.github.io/argo-helm
+	helm install argo-events argo/argo-events -n $${ARGO_NAMESPACE_PREFIX}-events --create-namespace
+	kubectl apply -n argo-events \
+		-f https://raw.githubusercontent.com/argoproj/argo-events/stable/examples/eventbus/native.yaml
