@@ -18,11 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Initialize
-        run: make clean
-      - name: Build
+      - {"name": "Clean", "run:" "make clean"}
+      - name: Bootstrap Cluster
         run: make bootstrap
-      - name: Integration Tests
+      - name: Deploy Platforms/Apps
         run: make deploy
       - name: Smoke Tests
         run: make test

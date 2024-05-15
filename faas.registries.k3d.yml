@@ -1,0 +1,11 @@
+##
+# NB: this doesn't actually work yet with multiple registries, only the first is used.
+# 
+##
+mirrors:
+  "docker.io":
+    endpoint:
+      - http://k3d-docker-io:5000
+  # "quay.io":
+  #   endpoint:
+  #     - http://k3d-quay-io:5001

@@ -1,21 +1,274 @@
+# k8s-tools: pin or customize versions for your whole k8s toolchain in one place.
+#   Docs: https://github.com/elo-enterprises/k8s-tools
+#   Latest: https://github.com/elo-enterprises/k8s-tools/tree/master/docker-compose.yml
 services:
-  wsk: &wsk
-    image: openwhisk:cli
+  base: &base
+    image: k8s:base
+    environment:
+      KUBECONFIG: "${KUBECONFIG}"
+      DOCKER_UID: ${DOCKER_UID:-1000}
+      DOCKER_GID: ${DOCKER_GID:-1000}
+      DOCKER_UGNAME: ${DOCKER_UGNAME:-user}
+      KREW_ROOT: /home/${DOCKER_UGNAME:-user}/.krew
+    build:
+      context: .
+      dockerfile_inline: |
+        ARG DOCKER_UID=${DOCKER_UID:-1000}
+        ARG DOCKER_GID=${DOCKER_UGNAME:-user}
+        ARG DOCKER_UGNAME=${DOCKER_UGNAME:-user}
+        FROM alpine/k8s:1.30.0 as builder
+        RUN apk --no-cache add procps make 
+        RUN cp /krew-* /usr/bin/krew
+        RUN KREW_ROOT=/tmp krew install ctx
+        RUN KREW_ROOT=/tmp krew install ns
+        RUN mv /tmp/bin/kubectl-ns /bin/kubens
+        RUN mv /tmp/bin/kubectl-ctx /bin/kubectx
+        FROM alpine/k8s:1.30.0 
+        COPY --from=builder /usr/bin/make /bin/ps /bin/kubens /bin/kubectx /bin
+        RUN apk --no-cache add ncurses shadow
+        RUN groupadd --gid ${DOCKER_GID:-1000} docker
+        RUN useradd --uid ${DOCKER_UID:-1000} --create-home -g docker ${DOCKER_UGNAME:-user}
+        USER ${DOCKER_UGNAME:-user}
+    user: ${DOCKER_UID:-1000}:${DOCKER_GID:-1000}
+    network_mode: host
+    working_dir: /workspace
+    volumes:
+      # NB: something like this if you're working with EKS and need AWS creds
+      # - ${HOME}/.aws:/home/user/.aws
+      # NB: something like this if you only want to share one file.
+      # - "${KUBECONFIG}:/kubeconfig.conf:ro"
+      # NB: `.cache` and `.config` as below are used by helm, maybe others?
+      - ${PWD}:/workspace
+      - ${HOME}/.kube:/home/user/.kube
+      - ${HOME}/.krew:/home/user/.krew
+      # used by helm, maybe others
+      - ${HOME}/.cache:/home/user/.cache
+      - ${HOME}/.config/helm:/home/user/.config/helm
+      - ${HOME}/.local:/home/user/.local:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    tty: true 
+
+  # https://helm.sh/docs/
+  helm:
+    <<: *base
+    entrypoint: helm
+  
+  # https://kubernetes.io/docs/reference/kubectl/
+  kubectl:
+    <<: *base
+    entrypoint: kubectl
+
+  # https://github.com/kubernetes-sigs/kustomize
+  kustomize:
+    <<: *base
+    entrypoint: kustomize
+
+  # https://github.com/databus23/helm-diff
+  helm-diff:
+    <<: *base
+    entrypoint: helm-diff
+
+  # https://github.com/helm-unittest/helm-unittest
+  helm-unittest:
+    <<: *base
+    entrypoint: helm-unittest
+
+  # https://github.com/chartmuseum/helm-push
+  helm-push:
+    <<: *base
+    entrypoint: helm-push
+
+  # https://github.com/kubernetes-sigs/aws-iam-authenticator
+  aws-iam-authenticator:
+    <<: *base
+    entrypoint: aws-iam-authenticator
+
+  # https://github.com/weaveworks/eksctl
+  eksctl:
+    <<: *base
+    entrypoint: eksctl
+
+  # https://github.com/aws/aws-cli
+  awscli: # v1
+    <<: *base
+    entrypoint: awscli
+
+  # https://github.com/bitnami-labs/sealed-secrets
+  kubeseal:
+    <<: *base
+    entrypoint: kubeseal
+
+  # https://github.com/kubernetes-sigs/krew
+  krew:
+    <<: *base
+    entrypoint: krew
+
+  # https://github.com/helmfile/vals
+  vals:
+    <<: *base
+    entrypoint: vals
+
+  # https://github.com/yannh/kubeconform
+  kubeconform:
+    <<: *base
+    entrypoint: kubeconform
+
+  # https://knative.dev/docs/client/install-kn/
+  kn: &knative
+    <<: *base
+    depends_on: ['base']
+    image: k8s:kn
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base as base
+        FROM ghcr.io/knative/func/func as builder
+        FROM gcr.io/knative-releases/knative.dev/client/cmd/kn:${KN_CLI_VERSION:-v1.14.0}
+        COPY --from=builder /ko-app/func /ko-app/func
+        COPY --from=base /usr/bin/kubectl /usr/bin/
+        RUN apk --no-cache add bash procps make
+        RUN cp /ko-app/func /usr/bin/kn-func
+
+  # https://github.com/arttor/helmify
+  helmify:
+    <<: *base
+    depends_on: ['base']
+    image: k8s:helmify
     build:
       context: .
       dockerfile_inline: |
         FROM debian
-        RUN apt-get update
-        RUN apt-get install -y wget
-        # RUN git clone https://github.com/apache/openwhisk-cli
-        RUN mkdir -p /opt/whisk-cli
-        RUN cd /opt/whisk-cli && wget https://github.com/apache/openwhisk-cli/releases/download/1.2.0/OpenWhisk_CLI-1.2.0-linux-amd64.tgz
-        RUN cd /opt/whisk-cli && tar -zxvf OpenWhisk_CLI-1.2.0-linux-amd64.tgz
-        RUN cp /opt/whisk-cli/wsk /usr/local/bin
-    # build: https://github.com/alpine-docker/k8s.git#master:/
+        RUN apt-get update && apt-get install -y curl
+        RUN cd /tmp && curl -s -Lo helmify.tgz \
+            https://github.com/arttor/helmify/releases/download/${HELMIFY_CLI_VERSION:-v0.4.12}/helmify_Linux_i386.tar.gz
+        RUN cd /tmp && tar -zxvf helmify.tgz && chmod +x helmify && mv helmify /usr/local/bin/
+    entrypoint: helmify
+    tty: false
+    stdin_open: true
+
+  # https://fission.io/docs/installation/
+  fission:
+    <<: *base
+    depends_on: ['base']
+    image: k8s:fission
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base
+        USER root 
+        RUN curl -s -Lo fission \
+            https://github.com/fission/fission/releases/download/v1.20.1/fission-v1.20.1-linux-amd64
+        RUN chmod +x fission && mv fission /usr/local/bin/
+        USER ${DOCKER_UGNAME:-user}
+    entrypoint: fission
+
+
+  # https://github.com/kubernetes/kompose/blob/main/docs/installation.md#github-release
+  kompose:
+    <<: *base
+    depends_on: ['base']
+    image: k8s:kompose
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base
+        USER root 
+        RUN curl -L https://github.com/kubernetes/kompose/releases/download/v1.33.0/kompose-linux-amd64 -o /usr/bin/kompose
+        RUN chmod ugo+x /usr/bin/kompose
+        USER ${DOCKER_UGNAME:-user}
+    entrypoint: kompose
+  
+  # https://argo-workflows.readthedocs.io/en/latest/walk-through/argo-cli/
+  # FIXME: pin version
+  argo:
+    <<: *base 
+    depends_on: ['base']
+    image: k8s:argo 
+    build:
+      context: . 
+      dockerfile_inline: |
+        FROM argoproj/argocli as argo
+        FROM k8s:base 
+        COPY --from=argo /bin/argo /bin/argo
+    entrypoint: argo 
+  
+  # https://github.com/txn2/kubefwd
+  # FIXME: pin version
+  kubefwd:
+    <<: *base 
+    depends_on: ['base']
+    image: k8s:kubefwd 
+    build:
+      context: . 
+      dockerfile_inline: |
+        FROM txn2/kubefwd as builder 
+        FROM k8s:base
+        COPY --from=builder /kubefwd /bin/kubefwd
+
+  # https://k3d.io/
+  k3d:
+    <<: *base
+    depends_on: ['base']
+    image: k8s:k3d
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base
+        USER root
+        RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION:-v5.6.3} bash
+        USER ${DOCKER_UGNAME:-user}
+    entrypoint: k3d
+  
+  # https://github.com/jesseduffield/lazydocker
+  lazydocker:
+    <<: *base
+    depends_on: ['base']
+    image: k8s:lazydocker
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM k8s:base
+        USER root
+        RUN wget https://github.com/jesseduffield/lazydocker/releases/download/v0.23.1/lazydocker_0.23.1_Linux_x86_64.tar.gz 
+        RUN tar -zxvf lazydocker*
+        RUN mv lazydocker /usr/bin && rm lazydocker*
+        USER ${DOCKER_UGNAME:-user}
+    entrypoint: lazydocker
+  
+
+  # https://github.com/charmbracelet/vhs
+  # vhs:
+  #   <<: *base
+  #   depends_on: ['base']
+  #   image: k8s:vhs
+  #   build:
+  #     context: .
+  #     dockerfile_inline: |
+  #       # FROM alpine/k8s:1.30.0 as builder
+  #       FROM ghcr.io/charmbracelet/vhs 
+  #       RUN apt-get install -y make python3 python3-yaml curl
+  #       RUN curl -fsSL https://get.docker.com -o get-docker.sh && bash get-docker.sh
+  #   entrypoint: vhs
+
+  # https://k9scli.io/
+  k9s:
+    # NB: no inheritance from `base` since `build` conflicts with `image`.
+    build: https://github.com/derailed/k9s.git#master:/
     tty: true
-    entrypoint: wsk
     network_mode: host
-    working_dir: /workspace
     volumes:
-      - ${PWD}:/workspace
+      - type: bind
+        source: ${KUBECONFIG}
+        target: /kubeconfig.conf
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      KUBECONFIG: "/kubeconfig.conf"
+    entrypoint: k9s
+
+  yq:
+    # NB: included in base, but this option is slimmer
+    image: mikefarah/yq:4.43.1
+
+  jq:
+    # NB: included in base, but this option is slimmer
+    image: ghcr.io/jqlang/jq:1.7.1

@@ -27,7 +27,6 @@
 </ul>
 </li>
 <li><a href="#references">References</a></li>
-<li><a href="#known-limitations-and-issues">Known Limitations and Issues</a></li>
 </ul>
 </div>
 
@@ -47,9 +46,11 @@ A self-contained, batteries-included environment / workbench for prototyping Fun
 
 **Besides a localhost-friendly cluster, there are no build dependencies at all except for docker.**  All of k3d/helm/kubectl & knative/argo/fission CLIs use independently versioned containers, starting with the alpine-k8s base.  The entire stack in this repository is exercised by tests with github actions, and should work anywhere else that is configured for docker-in-docker support.
 
-**This is intended to be a solid reference architecture for cluster-bootstrapping**, but it's mainly for experiments/benchmarking and isn't exactly what you would call production-ready.  But it's a good start for further iteration, because it's easy to yank out the components you don't need and customize the ones you want to keep.  
+**This is intended to be a solid reference architecture for cluster-bootstrapping**, but as for the FaaS platforms, it's mainly for experiments and benchmarking and not what you would call production-ready.  
 
-* **To point this automation at an existing cluster,** just disable the k3d bootstrap and use a different KUBECONFIG.
+It's a good start for further iteration though, because it's easy to yank out the components you don't need and customize the ones you want to keep.  If you're interested in that, next steps might involve:
+
+* **Pointing this automation at an existing cluster** involves disabling [the k3d bootstrap](#) and setting a different KUBECONFIG.
 * **Keeping the from-scratch cluster build but switching the backend from k3d to something like EKS** should also be fairly straightforward.  
 * **Event-sourcing from something like SQS takes more signficant effort,** but hopefully the automation layout makes it clear how to get started.
 
@@ -57,14 +58,11 @@ A self-contained, batteries-included environment / workbench for prototyping Fun
 
 ## Features
 
-* Bundles Fission, Knative, Argo & OpenWhisk CLI tools.  You can use those with the local deployments of the corresponding infrastructure, or against existing deployments.
-
+* Bundles [Fission](#), [Knative](#), ~~OpenWhisk~~, & [Argo](#)CLI tools.  
+    * You can use those CLIs with the local deployments infrastructure, or against existing deployments.
 * E2E demo for basic Fission infrastructure & application deployment
-
 * E2E demo for basic Knative infrastructure deployment *(app coming soon)*
-
-* E2E demo for basic Argo infrastructure deployment *(app coming soon)*
-
+* E2E demo for basic Argo infrastructure/app deployment
 -------------------------------------------------------------
 
 ## Quick Start
@@ -78,37 +76,47 @@ $ git clone git@github.com:elo-enterprises/k3d-faas.git
 # or for http
 $ git clone https://github.com/elo-enterprises/k3d-faas
 
+# teardown & setup just for the k3d cluster
+$ make clean bootstrap
+
 # teardown, setup, and exercise the entire stack
 $ make clean bootstrap deploy test
 
-# piecewise setup / teardown for infrastructure and apps
-$ make knative_infra.teardown knative_infra.setup
-$ make argo.teardown argo.setup
-$ make fission_infra.teardown fission_infra.setup
+# piecewise setup for platforms (infra+apps)
+ $ make argo.setup
+ $ make fission.setup
+ $ make prometheus.setup
 
-# test infrastructure components piecewise
-make fission_infra.test
-make knative_infra.test
-make argo_infra.test
+# tests by platform (infra+apps)
+ $ make argo.test
+ $ make cluster.test
+ $ make fission.test
+ $ make prometheus.test
 
-# test application components piecewise
-make fission_app.test
-make knative_app.test
-make argo_app.test
 ```
 
+Plus more granular targets 
+
+```bash 
+# piecewise setup for platform-infrastructure
+ $ make argo.infra.setup
+ $ make fission.infra.setup
+ $ make knative.infra.setup
+ $ make self.fission.infra.setup
+ $ make self.knative.infra.setup
+
+# piecewise setup for platform-apps
+ $ make argo.app.setup
+ $ make fission.app.setup
+ $ make knative.app.setup
+ $ make self.argo.app.setup
+ $ make self.knative.app.setup
+
+```
 -------------------------------------------------------------
 
 # References
 
 1. https://argoproj.github.io/argo-events/installation/
 1. <https://danquack.dev/blog/creating-faas-in-k8s-with-argo-events>
-
--------------------------------------------------------------
-
-# Known Limitations and Issues
-
-1. Placeholder
-1. Placeholder
-1. Placeholder
 
