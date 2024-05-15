@@ -68,10 +68,18 @@ $ git clone {{github.repo_url}}
 # teardown, setup, and exercise the entire stack
 $ make clean bootstrap deploy test
 
+# teardown/setup just the cluster
+$ make clean bootstrap
+
 # piecewise setup / teardown for infrastructure and apps
-$ make knative_infra.teardown knative_infra.setup
-$ make argo.teardown argo.setup
-$ make fission_infra.teardown fission_infra.setup
+$ make knative
+$ make argo
+$ make fission
+
+# equivalently, with more granularity:
+$ make knative_infra.teardown knative_infra.setup knative_app.setup
+$ make argo.teardown argo.setup argo_app.setup
+$ make fission_infra.teardown fission_infra.setup fission_app.setup
 
 # test infrastructure components piecewise
 make fission_infra.test

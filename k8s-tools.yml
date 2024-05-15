@@ -8,9 +8,16 @@ services:
     build:
       context: .
       dockerfile_inline: |
-        FROM alpine/k8s:1.30.0
+        FROM alpine/k8s:1.30.0 as builder
         RUN apk --no-cache add procps make
-        RUN apk add yq --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
+        RUN cp /krew-* /usr/bin/krew
+        RUN KREW_ROOT=/tmp krew install ctx
+        RUN KREW_ROOT=/tmp krew install ns
+        RUN mv /tmp/bin/kubectl-ns /bin/kubens
+        RUN mv /tmp/bin/kubectl-ctx /bin/kubectx
+        FROM alpine/k8s:1.30.0 
+        RUN apk add --no-cache ncurses # required for 'tput', which kubens and kubectx use
+        COPY --from=builder /usr/bin/make /bin/ps /bin/kubens /bin/kubectx /bin
     network_mode: host
     working_dir: /workspace
     volumes:
@@ -21,6 +28,7 @@ services:
       # NB: `.cache` and `.config` as below are used by helm, maybe others?
       - ${PWD}:/workspace
       - ${HOME}/.kube:/root/.kube
+      - ${HOME}/.krew:/root/.krew
       # used by helm, maybe others
       - ${HOME}/.cache:/root/.cache
       - ${HOME}/.config/helm:/root/.config/helm
@@ -28,6 +36,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       KUBECONFIG: "${KUBECONFIG}"
+      KREW_ROOT: /root/.krew
 
   helm:
     <<: *base
@@ -105,7 +114,7 @@ services:
         FROM gcr.io/knative-releases/knative.dev/client/cmd/kn:latest
         COPY --from=builder /ko-app/func /ko-app/func
         COPY --from=base /usr/bin/kubectl /usr/bin/kubectl
-        RUN apk --no-cache add bash procps make python3
+        RUN apk --no-cache add bash procps make
         RUN cp /ko-app/func /usr/local/bin/kn-func
 
   # https://github.com/arttor/helmify
@@ -152,6 +161,31 @@ services:
         RUN curl -L https://github.com/kubernetes/kompose/releases/download/v1.33.0/kompose-linux-amd64 -o /usr/bin/kompose
         RUN chmod ugo+x /usr/bin/kompose
     entrypoint: kompose
+  
+  # https://argo-workflows.readthedocs.io/en/latest/walk-through/argo-cli/
+  argo:
+    <<: *base 
+    depends_on: ['base']
+    image: k8s:argo 
+    build:
+      context: . 
+      dockerfile_inline: |
+        FROM argoproj/argocli as argo
+        FROM k8s:base 
+        COPY --from=argo /bin/argo /bin/argo
+    entrypoint: argo 
+  
+  # https://github.com/txn2/kubefwd
+  kubefwd:
+    <<: *base 
+    depends_on: ['base']
+    image: k8s:kubefwd 
+    build:
+      context: . 
+      dockerfile_inline: |
+        FROM txn2/kubefwd as builder 
+        FROM k8s:base
+        COPY --from=builder /kubefwd /bin/kubefwd
 
   # https://k3d.io/
   k3d:

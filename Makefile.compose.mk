@@ -43,9 +43,12 @@ export COMPOSE_MK?=0
 ########################################################################
 ## BEGIN: macros
 
-# Macro to yank all the compose-services out of YAML.  This drops into python unfortunately
-# and that's a significant dependency.  But bash or awk would be a nightmare, and 
-# even perl requires packages to be installed before it can parse YAML.
+# Macro to yank all the compose-services out of YAML.  
+# This drops into python unfortunately and that's a significant dependency.  
+# But bash or awk would be a nightmare, and even perl requires packages to be
+# installed before it can parse YAML.  To work around this, the COMPOSE_MK 
+# env-var is checked, so that inside containers `compose.get_services` always 
+# returns nothing.
 define compose.get_services
 	$(shell if [ "${COMPOSE_MK}" = "0" ]; then cat ${1} | python -c 'import yaml, sys; data=yaml.safe_load(sys.stdin.read()); svc=data["services"].keys(); print(" ".join(svc))'; else echo -n ""; fi)
 endef
@@ -61,22 +64,20 @@ $(eval namespaced_service:=${target_namespace}/$(compose_service_name))
 $(eval relf:=$(shell basename -s .yml $(compose_file)))
 
 ${relf}/$(compose_service_name)/shell:
-	@# WARNING: the assert statement is stupid reason to depend on python,
-	@#   but it can't be removed easily.  Bash and/or Make will warn of undefined
 	@export entrypoint=`docker compose -f $(compose_file) \
-		run --entrypoint sh $$(shell python -c"print('$$@'.split('/')[1:][0])") \
+		run --entrypoint sh $$(shell echo $$@|awk -F/ '{print $$$$2}') \
 		-c "which bash || which sh" \
 		2>/dev/null \
 		|| printf "$${COLOR_RED}Neither 'bash' nor 'sh' are available!\n(service=${compose_service_name} @ ${compose_file})\n$${NO_COLOR}" > /dev/stderr` \
 	&& ( \
-		( python -c "import os; assert os.environ['entrypoint'].strip()" &>/dev/null \
+		( env|grep entrypoint\= &>/dev/null \
 			|| exit 1 ) \
 		&& make ${relf}/$(compose_service_name) \
 	)
 
 ${relf}/$(compose_service_name)/shell/pipe:
 	pipe=yes \
-		make ${relf}/$$(shell python -c"print('$$@'.split('/')[1:][0])")/shell
+		make ${relf}/$(compose_service_name)/shell
 
 ${relf}/$(compose_service_name)/pipe:
 	cat /dev/stdin | make ⟂/${relf}/$(compose_service_name)
@@ -89,17 +90,17 @@ $(compose_service_name)/shell/pipe:
 	cat /dev/stdin | pipe=yes make ${relf}/$(compose_service_name)/shell
 endif)
 
-
 ${target_namespace}/$(compose_service_name):
 	@# A namespaced target for each docker-compose service
-	make ${relf}/$$(shell python -c"print('$$@'.split('/')[1:][0])")
+	make ${relf}/$$(shell echo $$@|awk -F/ '{print $$$$2}')
 
 ${target_namespace}/$(compose_service_name)/%:
 	@# A subtarget for each docker-compose service.
 	@# This allows invocation of *another* make-target
 	@# that runs inside the container
-	@echo COMPOSE_MK=1 make ${dispatch_prefix}$$(shell python -c"print('/'.join('$$@'.split('/')[2:]))") \
-		| make ⟫/${relf}/$$(shell python -c"print('$$@'.split('/')[1:][0])")
+	@export target_name=$$(shell echo $$@|awk -F/ '{print $$$$3}') \
+	&& echo COMPOSE_MK=1 make ${dispatch_prefix}$$$${target_name} \
+		| make ⟫/${relf}/$(compose_service_name)
 endef
 
 # Main macro to import services from an entire compose file
@@ -121,7 +122,7 @@ ${relf}/__services__:
 	@echo $(__services__)
 
 ${relf}/%:
-	@$$(eval export svc_name:=$$(shell python -c"print('$$@'.split('/')[1:][0])"))
+	@$$(eval export svc_name:=$$(shell echo $$@|awk -F/ '{print $$$$2}'))
 	@$$(eval export cmd:=$(shell echo $${cmd:-}))
 	@$$(eval export pipe:=$(shell if [ -z "$${pipe:-}" ]; then echo ""; else echo "-T"; fi))
 	@$$(eval export entrypoint:=$(shell if [ -z "$${entrypoint:-}" ]; then echo ""; else echo "--entrypoint $${entrypoint}"; fi))
@@ -131,7 +132,7 @@ ${relf}/%:
 		eval $${base} ; \
 	else \
 		cat /dev/stdin > "$${tmpf}" \
-		&& (printf "$${COLOR_GREEN}→ ($${svc_name}) $${COLOR_DIM}\n`\
+		&& (printf "$${COLOR_GREEN}→ ($${relf}/$${svc_name}:) $${COLOR_DIM}\n`\
 				cat $${tmpf} | sed -e 's/COMPOSE_MK=1//' \
 			`\n$${NO_COLOR}" >&2)  \
 		&& trap "rm -f $${tmpf}" EXIT \
@@ -157,11 +158,13 @@ help:
 
 ## END: meta targets
 ########################################################################
-## BEGIN: convenience targets (api-unstable: these might change)
+## BEGIN: convenience targets (api-stable)
 
 compose.wait/%:
 	printf "${COLOR_DIM}Waiting for ${*} seconds..${NO_COLOR}\n" > /dev/stderr \
 	&& sleep ${*}
+compose.indent:
+	cat /dev/stdin | sed 's/^/  /'
 
 compose.init:
 	@# Ensure compose is available and build it
@@ -189,16 +192,62 @@ docker.panic:
 	docker volume prune -f
 	docker system prune -a -f
 
-k8s.create.namespace:
-	kubectl create namespace $${namespace} \
+# NB: looks empty, but don't edit this, it helps make to understand newline literals
+define newline
+
+
+endef
+
+define k8s.test_pod.template
+{
+	"apiVersion":"v1",
+	"kind":"Pod",
+	"metadata":{"name":"${pod_name}"},
+	"spec":{
+		"containers":[
+			{ "name":"${pod_name}-container",
+			  "image":"${pod_image}",
+			  "command": ["sleep","infinity"] }
+		]
+	} 
+}
+endef
+k8s.kubens/%: 
+	TERM=xterm kubens ${*} 2>&1 | make compose.indent > /dev/stderr
+↪k8s.kubens/%: 
+	TERM=xterm kubens ${*} 2>&1 | make compose.indent > /dev/stderr
+
+k8s.kubens.create/%:
+	make k8s.namespace.create/${*}
+	make k8s.kubens/${*}
+k8s.test_pod.in_namespace:
+	export manifest=`printf '$(subst $(newline),\n,$(call k8s.test_pod.template))\n'` \
+	&& printf "$${COLOR_DIM}\n$${manifest}\n$${NO_COLOR}" > /dev/stderr \
+	&& printf "$${manifest}" \
+	| jq . | (set -x && kubectl apply --namespace $${namespace} -f -)
+
+k8s.pod.shell:
+	echo 
+k8s.namespace.create/%:
+	printf '\n' >/dev/stderr 
+	kubectl create namespace ${*} \
 		--dry-run=client -o yaml \
-	| kubectl apply -f -
+	| kubectl apply -f - \
+	2>&1 | make compose.indent
 
 k8s.namespace.purge:
-	kubectl delete namespace --cascade=background $${namespace} 2>/dev/null || true
+	set -x && kubectl delete namespace --cascade=background $${namespace} -v=9 2>/dev/null || true
 k8s.namespace.list:
 	kubectl get namespaces -o json \
 	| jq -r '.items[].metadata.name'
+
+k8s.purge.namespaces_by_prefix:
+	make k8s.namespace.list \
+	| grep $${namespace_prefix} \
+	|| (\
+		printf "${COLOR_DIM}Nothing to purge: no namespaces matching \`$${namespace_prefix}*\`${NO_COLOR}\n" \
+		> /dev/stderr )\
+	| xargs -n1 -I% bash -x -c "namespace=% make k8s.namespace.purge"
 
 ## END: convenience targets
 ########################################################################

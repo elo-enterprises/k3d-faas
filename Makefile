@@ -85,6 +85,8 @@ this_cluster.clean: ▰/k3d/this_cluster.clean
 ↪this_cluster.auth:
 	rmdir $${KUBECONFIG} 2>/dev/null || rm -f $${KUBECONFIG}
 	k3d kubeconfig merge $${CLUSTER_NAME} --output $${KUBECONFIG}
+# ↪this_cluster.test:
+# 	namespace=default make k8s.test_pod.in_namespace
 
 # END: Cluster-ops
 ####################################################################################
@@ -92,17 +94,17 @@ this_cluster.clean: ▰/k3d/this_cluster.clean
 #   Infra uses `kubectl` container, but apps require the `fission` container for CLI
 #   - https://fission.io/docs/installation/
 #   - https://fission.io/docs/reference/fission-cli/fission_token_create/
-
 export FISSION_NAMESPACE?=fission
+export FISSION_VERSION?=v1.20.1
 fission_infra.setup: ▰/base/fission_infra.setup compose.wait/30 project.show
 fission_infra.teardown: ▰/base/fission_infra.teardown
 fission_infra.test: ▰/fission/fission_infra.test
 fission_infra.test: ▰/fission/fission_infra.test
 ↪fission_infra.setup:
-	kubectl create -k "github.com/fission/fission/crds/v1?ref=v1.20.1" || true
-	kubectl create namespace $${FISSION_NAMESPACE}
+	kubectl create -k "github.com/fission/fission/crds/v1?ref=${FISSION_VERSION}" || true
+	make k8s.kubens.create/$${FISSION_NAMESPACE}
 	kubectl config set-context --current --namespace=$${FISSION_NAMESPACE}
-	kubectl apply -f https://github.com/fission/fission/releases/download/v1.20.1/fission-all-v1.20.1-minikube.yaml
+	kubectl apply -f https://github.com/fission/fission/releases/download/${FISSION_VERSION}/fission-all-${FISSION_VERSION}-minikube.yaml
 	kubectl config set-context --current --namespace=default
 ↪fission_infra.teardown: 
 	namespace=$${FISSION_NAMESPACE} make k8s.namespace.purge 
@@ -122,16 +124,32 @@ fission_infra.test: ▰/fission/fission_infra.test
 
 fission_app.setup: fission_infra.test
 fission_app.setup: ▰/fission/fission_app.deploy
+fission_app.setup: compose.wait/60 fission_app.test
+fission_app.test: ▰/fission/fission_app.test
+
+
+# FIXME: 
+# ↪fission_infra.auth: $(eval $(call FISSION_AUTH_TOKEN))
+# define FISSION_AUTH_TOKEN
+# FISSION_AUTH_TOKEN=`\
+#               kubectl get secrets -n $${FISSION_NAMESPACE} -o json \
+#               | jq -r '.items[]|select(.metadata.name|startswith("fission-router")).data.token' \
+#               | base64 -d`
+# endef
+
+
+fission_app.setup: fission_infra.test
+fission_app.setup: ▰/fission/fission_app.deploy
 fission_app.setup: compose.wait/35 fission_app.test
 fission_app.test: ▰/fission/fission_app.test
-↪fission_app.deploy:
+↪fission_app.deploy: 
 	( fission env list | grep fission/python-env ) \
-		|| fission env create --name python --image fission/python-env
-↪fission_app.test:
-	@#
+			|| fission env create --name python --image fission/python-env
+↪fission_app.test: 
 	(fission function list | grep fission-app) \
-		|| fission function create --name fission-app --env python --code src/fission/app.py \
+			|| fission function create --name fission-app --env python --code src/fission/app.py \
 	&& fission function test --timeout=0 --name fission-app
+
 
 # END: Fission infra/apps
 ####################################################################################
@@ -141,22 +159,23 @@ fission_app.test: ▰/fission/fission_app.test
 #   - https://knative.dev/docs/getting-started/first-service/
 #   - https://knative.dev/docs/samples/
 export KNATIVE_NAMESPACE_PREFIX := knative-
+knative: knative_infra.teardown knative_infra.setup knative_app.setup
 knative_infra.setup: ▰/base/knative_infra.setup
 knative_infra.test: ▰/kn/knative_infra.test
 knative_infra.teardown: ▰/base/knative_infra.teardown
-↪knative_infra.setup:
+↪knative_infra.setup: ↪knative_infra.operator ↪knative_infra.serving
+↪knative_infra.operator:
 	kubectl create -f https://github.com/knative/operator/releases/download/knative-v1.5.1/operator-post-install.yaml || true
 	kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.14.0/operator.yaml || true
-	make ↪knative_infra.serving
 ↪knative_infra.serving:
 	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-crds.yaml
 	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-core.yaml
 ↪knative_infra.auth:
 	echo knative_infra.auth placeholder
-↪knative_infra.test:
+↪knative_infra.test: k8s.kubens/knative-serving
 	func version
 	kn version
-	kubectl get pods --namespace knative-serving
+	kubectl get pods
 	cd src/knf/; tree
 ↪knative_infra.teardown: 
 	make k8s.namespace.list \
@@ -184,13 +203,63 @@ docs:
 ####################################################################################
 # https://argoproj.github.io/argo-events/quick_start/
 export ARGO_NAMESPACE_PREFIX:=argo
-argo: argo_infra.teardown argo_infra.setup 
-argo_infra.setup: ▰/base/argo_infra.setup
+export ARGO_EVENTS_URL:=https://raw.githubusercontent.com/argoproj/argo-events
+
+argo: argo_infra argo_app
+
+argo_infra: argo_infra.teardown argo_infra.setup compose.wait/60 argo_infra.test
+
+argo_infra.setup: ▰/base/argo_infra.setup_base ▰/base/argo_infra.setup_events 
+↪argo_infra.setup_base: k8s.kubens.create/argo
+	kubectl apply -f https://github.com/argoproj/argo-workflows/releases/download/v3.5.4/install.yaml
+
+# FIXME: pin versions
+↪argo_infra.setup_events: k8s.kubens.create/argo-events
+	kubectl apply -f ${ARGO_EVENTS_URL}/stable/manifests/install.yaml
+	kubectl apply -n argo-events -f ${ARGO_EVENTS_URL}/6a44acd1ac57a52/examples/eventbus/native.yaml
+	kubectl apply -n argo-events -f ${ARGO_EVENTS_URL}/6a44acd1ac57a52/examples/event-sources/webhook.yaml
+	kubectl apply -n argo-events -f ${ARGO_EVENTS_URL}/6a44acd1ac57a52/examples/rbac/sensor-rbac.yaml
+	kubectl apply -n argo-events -f ${ARGO_EVENTS_URL}/6a44acd1ac57a52/examples/rbac/workflow-rbac.yaml
+	# kubectl apply -n argo-events -f ${ARGO_EVENTS_URL}/6a44acd1ac57a52/examples/sensors/webhook.yaml
+	kubectl apply -n argo-events -f src/argo/webhook.sensor.yaml
 argo_infra.teardown: ▰/base/argo_infra.teardown
 ↪argo_infra.teardown: 
-	make k8s.namespace.list 
-↪argo_infra.setup:
-	helm repo list |grep $${ARGO_NAMESPACE_PREFIX} || helm repo add argo https://argoproj.github.io/argo-helm
-	helm install argo-events argo/argo-events -n $${ARGO_NAMESPACE_PREFIX}-events --create-namespace
-	kubectl apply -n argo-events \
-		-f https://raw.githubusercontent.com/argoproj/argo-events/stable/examples/eventbus/native.yaml
+	# namespace_prefix=$${ARGO_NAMESPACE_PREFIX} make k8s.purge.namespaces_by_prefix
+
+argo_infra.expose: ▰/kubefwd/argo_infra.expose
+↪argo_infra.expose: k8s.kubens/argo-events
+	kubefwd svc -v -f metadata.name=webhook-eventsource-svc
+argo_infra.test: ▰/base/argo_infra.test_harness ▰/base/argo_infra.test_webhook
+↪argo_infra.test_harness: k8s.kubens/argo-events
+	export pod_image="alpine/k8s:1.30.0" pod_name=test-harness \
+	&& kubectl delete pod $${pod_name} --now --wait || true \
+	&& namespace=`kubens -c` make k8s.test_pod.in_namespace \
+	&& set -x \
+	&& kubectl wait --for=condition=Ready pod/$${pod_name} --timeout=999s
+↪argo_infra.test_webhook: k8s.kubens/argo-events
+	export tmpf=`mktemp` && trap "rm -f $${tmpf}" EXIT \
+	&& set -x \
+	&& kubectl get svc \
+		webhook-eventsource-svc \
+		-o json \
+		| jq .spec > $${tmpf} \
+	&& cat $$tmpf \
+	&& export ip=`cat $${tmpf}|jq -r .clusterIP` \
+	&& export port=`cat $${tmpf}|jq -r .ports[0].port`  \
+	&& kubectl exec -i \
+		test-harness -- /bin/bash -c "curl -s \
+			-d '{\"message\":\"this is my first webhook\"}' \
+			-H \"Content-Type: application/json\" \
+			-X POST http://$${ip}:$${port}/example"
+
+argo_app: ▰/argo/argo_app.setup
+↪argo_app.setup: k8s.kubens/argo-events
+
+argo_app.test: ▰/argo/argo_app.test
+↪argo_app.test: k8s.kubens/argo-events
+	kubectl get po
+	kubectl get svc
+	argo version
+	kubectl -n argo-events get workflows | grep "webhook"
+	argo list | grep webhook
+	argo get @latest
