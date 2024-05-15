@@ -47,6 +47,9 @@ $(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/k8s-tools.yml))
 ####################################################################################
 # BEGIN: Top-level:: These are the main entrypoints that you probably want.
 
+build: 
+	@# Not used from automation, containers are pulled when they change
+	docker compose -f k8s-tools.yml build
 project.show: ▰/base/show
 project.registry:
 	set -x && k3d registry list|grep k3d-docker-io \
@@ -62,7 +65,6 @@ project.registry:
 	# curl -u docker:docker http://localhost:3000/v2/_catalog
 project.registry.list:
 
-
 ↪show:
 	@#
 	echo CLUSTER_NAME=$${CLUSTER_NAME}
@@ -74,16 +76,11 @@ project.registry.list:
 clean: this_cluster.clean compose.clean
 bootstrap: docker.init compose.init this_cluster.bootstrap project.show
 
-deploy: \
-	deploy.infra \
-	deploy.apps
-deploy.infra: \
-	fission_infra.setup \
-	fission_app.setup 
-# argo_infra.setup
-# deploy.infra: knative_infra.setup 
-# deploy.infra: 
-deploy.apps: 
+deploy: deploy.fission deploy.argo deploy.knative
+deploy.fission: fission_infra.setup fission_app.setup
+deploy.argo: argo_infra.setup
+deploy.knative: knative_infra.setup 
+deploy.apps: fission_app.setup 
 # fission_app.setup 
 # deploy.apps: knative_app.setup
 
@@ -156,12 +153,14 @@ fission_infra.test: ▰/fission/fission_infra.test
 	&& fission version \
 	&& fission check
 
+k9s/%:
+	make k9s cmd="-n ${*}"
 fission_app.setup: fission_infra.test ▰/fission/fission_app.deploy compose.wait/5 fission_app.test
 fission_app.test: ▰/fission/fission_app.test
-↪fission_app.deploy: #k8s.kubens/fission
+↪fission_app.deploy: k8s.kubens/default
 	( fission env list | grep fission/python-env ) \
 		|| fission env create --name python --image fission/python-env
-↪fission_app.test: #k8s.kubens/fission
+↪fission_app.test: k8s.kubens/default
 	@#
 	set -x && echo $$FUNCTION_NAMESPACE && (fission function list | grep fission-app) \
 		|| fission function create --name fission-app --env python --code src/fission/app.py \
@@ -180,15 +179,20 @@ knative: knative_infra.teardown knative_infra.setup knative_app.setup
 knative_infra.setup: ▰/base/knative_infra.setup
 knative_infra.test: ▰/kn/knative_infra.test
 knative_infra.teardown: ▰/base/knative_infra.teardown
-↪knative_infra.setup: ↪knative_infra.operator ↪knative_infra.serving
-↪knative_infra.operator:
-	kubectl create -f https://github.com/knative/operator/releases/download/knative-v1.5.1/operator-post-install.yaml || true
-	kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.14.0/operator.yaml || true
-↪knative_infra.serving:
-	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-crds.yaml
-	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-core.yaml
-↪knative_infra.auth:
-	echo knative_infra.auth placeholder
+↪knative_infra.setup: #↪knative_infra.operator ↪knative_infra.serving
+	kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.0/serving-crds.yaml
+	kubectl apply -f https://github.com/knative/serving/releases/download/knative-v1.14.0/serving-core.yaml
+	kubectl apply -f https://github.com/knative/eventing/releases/download/knative-v1.14.1/eventing-crds.yaml
+	kubectl apply -f https://github.com/knative/eventing/releases/download/knative-v1.14.1/eventing-core.yaml
+	kubectl get pods -n knative-eventing
+# ↪knative_infra.operator:
+# 	#kubectl create -f https://github.com/knative/operator/releases/download/knative-v1.5.1/operator-post-install.yaml || true
+# 	#kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.14.0/operator.yaml || true
+# ↪knative_infra.serving:
+# 	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-crds.yaml
+# 	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-core.yaml
+# ↪knative_infra.auth:
+# 	echo knative_infra.auth placeholder
 ↪knative_infra.test: k8s.kubens/knative-serving
 	func version
 	kn version

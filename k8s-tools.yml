@@ -217,7 +217,7 @@ services:
       context: .
       dockerfile_inline: |
         FROM k8s:base
-        RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.0.0 bash
+        RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.6.3 bash
     entrypoint: k3d
 
   # https://k9scli.io/
