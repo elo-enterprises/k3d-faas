@@ -2,7 +2,28 @@
 #   Docs: https://github.com/elo-enterprises/k8s-tools
 #   Latest: https://github.com/elo-enterprises/k8s-tools/tree/master/docker-compose.yml
 services:
-
+  # docker-registry:
+  #   # /etc/docker/daemon.json 
+  #   #   { "registry-mirrors": ["https://localhost:3000"] }
+  #   build:
+  #     context: . 
+  #     dockerfile_inline: |
+  #       FROM registry:2
+  #       RUN apk add --no-cache apache2-utils
+  #       RUN mkdir /auth 
+  #       RUN htpasswd -bBc /auth/registry.password docker docker
+  #   ports:
+  #     - "3000:5000"
+  #   environment:
+  #     REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /data
+  #     REGISTRY_PROXY_REMOTEURL:https://registry-1.docker.io
+  #     REGISTRY_AUTH: htpasswd
+  #     REGISTRY_AUTH_HTPASSWD_REALM: Registry
+  #     REGISTRY_AUTH_HTPASSWD_PATH: /auth/registry.password
+  #   volumes:
+  #     # - ${PWD}/registry/auth:/auth
+  #     - ${PWD}/registry/data:/data
+  
   base: &base
     image: k8s:base
     build:
@@ -196,7 +217,7 @@ services:
       context: .
       dockerfile_inline: |
         FROM k8s:base
-        RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.3.0 bash
+        RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.0.0 bash
     entrypoint: k3d
 
   # https://k9scli.io/

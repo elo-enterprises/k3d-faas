@@ -109,7 +109,7 @@ $(eval target_namespace:=$1)
 $(eval dispatch_prefix:=$2)
 $(eval import_to_root := $(if $(3), $(strip $(3)), FALSE))
 $(eval compose_file:=$(strip $4))
-$(eval relf:=$(shell basename -s .yml $(strip $4)))
+$(eval relf:=$(shell basename -s .yml $(strip ${4})))
 $(eval __services__:=$(call compose.get_services, ${compose_file}))
 
 ⟫/${relf}/%:
@@ -132,8 +132,8 @@ ${relf}/%:
 		eval $${base} ; \
 	else \
 		cat /dev/stdin > "$${tmpf}" \
-		&& (printf "$${COLOR_GREEN}→ ($${relf}/$${svc_name}:) $${COLOR_DIM}\n`\
-				cat $${tmpf} | sed -e 's/COMPOSE_MK=1//' \
+		&& (printf "$${COLOR_GREEN}→ ($$(shell basename -s .yml $${compose_file})/$${svc_name} service) $${COLOR_DIM}\n`\
+				cat $${tmpf} | sed -e 's/COMPOSE_MK=1//' | make compose.indent | make compose.indent \
 			`\n$${NO_COLOR}" >&2)  \
 		&& trap "rm -f $${tmpf}" EXIT \
 		&& cat "$${tmpf}" | eval $${base} \
