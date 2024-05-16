@@ -19,18 +19,18 @@ servers: 3
 agents: 7 
 
 # https://k3d.io/v5.6.0/usage/registries/#creating-a-registry-proxy-pull-through-registry-via-configfile
-registries:
-  create:
-    name: docker-io # name of the registry container
-    proxy:
-      remoteURL: https://registry-1.docker.io # proxy DockerHub
-    volumes:
-      - /tmp/reg:/var/lib/registry # persist data locally in /tmp/reg
-  config: | # tell K3s to use this registry when pulling from DockerHub
-    mirrors:
-      "docker.io":
-        endpoint:
-          - http://docker-io:5000
+# registries:
+#   create:
+#     name: docker-io # name of the registry container
+#     proxy:
+#       remoteURL: https://registry-1.docker.io # proxy DockerHub
+#     volumes:
+#       - /tmp/reg:/var/lib/registry # persist data locally in /tmp/reg
+#   config: | # tell K3s to use this registry when pulling from DockerHub
+#     mirrors:
+#       "docker.io":
+#         endpoint:
+#           - http://docker-io:5000
 
 # kubeAPI: # same as `--api-port myhost.my.domain:6445` (where the name would resolve to 127.0.0.1)
 #   host: "myhost.my.domain" # important for the `server` setting in the kubeconfig

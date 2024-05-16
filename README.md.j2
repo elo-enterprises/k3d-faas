@@ -57,7 +57,7 @@ A self-contained, batteries-included environment / workbench for prototyping Fun
 ## Quick Start
 
 ### Clone/Build/Test This Repo
-
+{% set strip_ansi=' | make compose.strip_ansi %}
 ```bash
 # for ssh
 $ git clone {{github.repo_ssh_url}}
@@ -68,13 +68,14 @@ $ git clone {{github.repo_url}}
 # teardown, setup, and exercise the entire stack
 $ make clean bootstrap deploy test
 
-# teardown/setup just the cluster
+# teardown & setup just for the k3d cluster
 $ make clean bootstrap
+{#{bash('make clean bootstrap'+strip_ansi)}#}
 
 # piecewise setup / teardown for infrastructure and apps
-$ make knative
-$ make argo
-$ make fission
+$ make deploy.knative
+$ make deploy.argo
+$ make deploy.fission
 
 # equivalently, with more granularity:
 $ make knative_infra.teardown knative_infra.setup knative_app.setup

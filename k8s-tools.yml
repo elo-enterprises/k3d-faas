@@ -2,12 +2,13 @@
 #   Docs: https://github.com/elo-enterprises/k8s-tools
 #   Latest: https://github.com/elo-enterprises/k8s-tools/tree/master/docker-compose.yml
 services:
-  
   base: &base
     image: k8s:base
     build:
       context: .
       dockerfile_inline: |
+        #ARG USER_UID=1000
+        #ARG GROUP_GID=1000
         FROM alpine/k8s:1.30.0 as builder
         RUN apk --no-cache add procps make
         RUN cp /krew-* /usr/bin/krew
@@ -201,6 +202,20 @@ services:
         FROM k8s:base
         RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.6.3 bash
     entrypoint: k3d
+  
+  # https://github.com/charmbracelet/vhs
+  # vhs:
+  #   <<: *base
+  #   depends_on: ['base']
+  #   image: k8s:vhs
+  #   build:
+  #     context: .
+  #     dockerfile_inline: |
+  #       # FROM alpine/k8s:1.30.0 as builder
+  #       FROM ghcr.io/charmbracelet/vhs 
+  #       RUN apt-get install -y make python3 python3-yaml curl
+  #       RUN curl -fsSL https://get.docker.com -o get-docker.sh && bash get-docker.sh
+  #   entrypoint: vhs
 
   # https://k9scli.io/
   k9s:
