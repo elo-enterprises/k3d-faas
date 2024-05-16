@@ -1,7 +1,7 @@
 ##
 # Makefile.compose.mk
 #
-# This is designed to be used as an `include` inside your project's main Makefile.
+# This is designed to be used as an `include` from your project's main Makefile.
 #
 # DOCS: https://github.com/elo-enterprises/k8s-tools#Makefile.compose.mk
 #
@@ -98,8 +98,7 @@ ${target_namespace}/$(compose_service_name)/%:
 	@# A subtarget for each docker-compose service.
 	@# This allows invocation of *another* make-target
 	@# that runs inside the container
-	@export target_name=$$(shell echo $$@|awk -F/ '{print $$$$3}') \
-	&& echo COMPOSE_MK=1 make ${dispatch_prefix}$$$${target_name} \
+	@echo COMPOSE_MK=1 make ${dispatch_prefix}$${*} \
 		| make ⟫/${relf}/$(compose_service_name)
 endef
 
@@ -120,6 +119,12 @@ $(eval __services__:=$(call compose.get_services, ${compose_file}))
 
 ${relf}/__services__:
 	@echo $(__services__)
+${relf}/__build__:
+	docker compose -f $${compose_file} build
+${relf}/__stop__:
+	docker compose -f $${compose_file} stop -t 1
+${relf}/__up__:
+	docker compose -f $${compose_file} up
 
 ${relf}/%:
 	@$$(eval export svc_name:=$$(shell echo $$@|awk -F/ '{print $$$$2}'))
@@ -132,8 +137,8 @@ ${relf}/%:
 		eval $${base} ; \
 	else \
 		cat /dev/stdin > "$${tmpf}" \
-		&& (printf "$${COLOR_GREEN}→ ($$(shell basename -s .yml $${compose_file})/$${svc_name} service) $${COLOR_DIM}\n`\
-				cat $${tmpf} | sed -e 's/COMPOSE_MK=1//' | make compose.indent | make compose.indent \
+		&& (printf "$${COLOR_GREEN}→ ${COLOR_DIM}container-dispatch\n  ${NO_COLOR}file=${COLOR_DIM}${COLOR_GREEN}$$(shell basename $${compose_file})${NO_COLOR}\n  service=${COLOR_GREEN}$${svc_name}${NO_COLOR} $${COLOR_DIM}\n `\
+				cat $${tmpf} | sed -e 's/COMPOSE_MK=1//' \
 			`\n$${NO_COLOR}" >&2)  \
 		&& trap "rm -f $${tmpf}" EXIT \
 		&& cat "$${tmpf}" | eval $${base} \
@@ -159,6 +164,13 @@ help:
 ## END: meta targets
 ########################################################################
 ## BEGIN: convenience targets (api-stable)
+k9s/%:
+	@# Opens k9s UI at the given namespace
+	make k9s cmd="-n ${*}"
+compose.mktemp:
+	export tmpf=`mktemp` \
+	&& trap "rm -f $${tmpf}" EXIT \
+	&& echo $${tmpf}
 
 compose.wait/%:
 	printf "${COLOR_DIM}Waiting for ${*} seconds..${NO_COLOR}\n" > /dev/stderr \
@@ -172,21 +184,21 @@ compose.init:
 	&& make compose.build
 
 compose.build:
-	@#
 	docker compose build
 
 compose.clean:
-	@#
 	docker compose down --remove-orphans
 compose.bash:
 	env bash -l
 
 docker.init:
 	@# Check if docker is available, no real setup
-	@docker --version
+	docker --version
 
 docker.panic:
-	@# Careful, this is potentially devastating in production..
+	@# Debugging only!  Running this from automation will 
+	@# probably quickly hit rate-limiting at dockerhub,
+	@# and obviously this is dangerous for production..
 	docker rm -f $$(docker ps -qa | tr '\n' ' ')
 	docker network prune -f
 	docker volume prune -f
@@ -200,68 +212,107 @@ endef
 
 define k8s.test_pod.template
 {
-	"apiVersion":"v1",
+	"apiVersion": "v1",
 	"kind":"Pod",
-	"metadata":{"name":"${pod_name}"},
+	"metadata":{"name": "$(strip ${1})"},
 	"spec":{
-		"containers":[
-			{ "name":"${pod_name}-container",
-			  "image":"${pod_image}",
+		"containers": [
+			{ "name": "$(strip ${1})-container",
+			  "image": "$(strip ${2})",
 			  "command": ["sleep","infinity"] }
 		]
 	} 
 }
 endef
 k8s.kubens/%: 
+	@# Sets the given namespace as active.  
+	@# Note that this modifies state in the kubeconfig,
+	@# and so it can effect contexts outside of the current
+	@# process, so this is not thread-safe.
 	TERM=xterm kubens ${*} 2>&1 | make compose.indent > /dev/stderr
+
 ↪k8s.kubens/%: 
+	@# Alias for the top-level target
 	TERM=xterm kubens ${*} 2>&1 | make compose.indent > /dev/stderr
 
 k8s.kubens.create/%:
+	@# Sets the given namespace as active, creating it if necessary.
 	make k8s.namespace.create/${*}
 	make k8s.kubens/${*}
-k8s.test_pod.in_namespace:
-	export manifest=`printf '$(subst $(newline),\n,$(call k8s.test_pod.template))\n'` \
+
+k8s.test_pod_in_namespace/%:
+	$(eval export namespace:=$(strip $(shell echo ${*}|awk -F/ '{print $$1}'))) \
+	$(eval export pod_name:=$(strip $(shell echo ${*}|awk -F/ '{print $$2}'))) \
+	$(eval export pod_image:=$(strip $(shell echo ${*}|awk -F/ '{print $$3}'))) \
+	export manifest=`printf '$(subst $(newline),\n, $(call k8s.test_pod.template, ${pod_name}, ${pod_image}))\n'` \
 	&& printf "$${COLOR_DIM}\n$${manifest}\n$${NO_COLOR}" > /dev/stderr \
 	&& printf "$${manifest}" \
 	| jq . | (set -x && kubectl apply --namespace $${namespace} -f -)
+	make k8s.namespace.wait/$${namespace}
+↪k8s.test_pod_in_namespace/%: 
+	make k8s.test_pod_in_namespace/${*}
 
-k8s.pod.shell:
-	echo 
+k8s.namespace/%:
+	@# Context-manager.  Activates the given namespace.
+	@# (This has side-effects and persists for subprocesses)
+	make k8s.kubens/${*}
+
+
 k8s.namespace.create/%:
+	@# Idempotent version of create
 	printf '\n' >/dev/stderr 
 	kubectl create namespace ${*} \
 		--dry-run=client -o yaml \
 	| kubectl apply -f - \
 	2>&1 | make compose.indent
 
-k8s.namespace.purge:
-	set -x && kubectl delete namespace --cascade=background $${namespace} -v=9 2>/dev/null || true
+k8s.namespace.purge/%:
+	@# Wipes everything inside the given namespace
+	printf "${COLOR_GREEN}${COLOR_DIM}k8s.namespace.purge /${NO_COLOR}${COLOR_GREEN}${*}${NO_COLOR} Waiting for delete (cascade=foreground) \n" > /dev/stderr \
+	&& set +x \
+	&& kubectl delete namespace \
+		--cascade=foreground ${*} \
+		-v=9 2>/dev/null || true
 k8s.namespace.list:
+	@# Returns all namespaces in a simple array 
+	@# WARNING: Must remain suitable for use with `xargs`
 	kubectl get namespaces -o json \
 	| jq -r '.items[].metadata.name'
 
-k8s.purge.namespaces_by_prefix:
+k8s.purge_namespaces_by_prefix/%:
+	@# Deletes every matching namespace
 	make k8s.namespace.list \
-	| grep $${namespace_prefix} \
+	| grep ${*} \
 	|| (\
-		printf "${COLOR_DIM}Nothing to purge: no namespaces matching \`$${namespace_prefix}*\`${NO_COLOR}\n" \
+		printf "${COLOR_DIM}Nothing to purge: no namespaces matching \`${*}*\`${NO_COLOR}\n" \
 		> /dev/stderr )\
-	| xargs -n1 -I% bash -x -c "namespace=% make k8s.namespace.purge"
+	| xargs -n1 -I% bash -x -c "make k8s.namespace.purge/%"
 
-k8s.wait_for_namespace/%:
+k8s.namespace.wait/%:
+	@# Waits for every pod in the given namespace to be ready
+	@# NB: If the parameter is "all" then this uses --all-namespaces
 	export scope=`[ "${*}" == "all" ] && echo "--all-namespaces" || echo "-n ${*}"` \
-	&& printf "${COLOR_GREEN}Looking for pods in 'waiting' state..${NO_COLOR}\n" > /dev/stderr \
+	&& printf "${COLOR_GREEN}${COLOR_DIM}k8s.namespace.wait/${NO_COLOR}${COLOR_GREEN}${*}${NO_COLOR} :: Looking for pending pods.. \n" > /dev/stderr \
+	&& export header="${COLOR_GREEN}${COLOR_DIM}k8s.namespace.wait // ${NO_COLOR}" \
+	&& export header="$${header}${COLOR_GREEN}${*}${NO_COLOR}" \
 	&& until \
-		kubectl get pods $${scope} -o json \
-		| jq '[.items[].status.containerStatuses[].state|select(.waiting).waiting]' \
-		| tee /dev/stderr \
-		| jq '.[] | halt_error(length)' \
+		export tmpf=`make compose.mktemp` \
+		&& kubectl get pods $${scope} -o json \
+		| jq '[.items[].status.containerStatuses[]|select(.state.waiting)]' \
+		> $${tmpf} \
+		&& printf "$(strip $(shell cat $${tmpf}|sed -e 's/\[\]//'))" > /dev/stderr \
+		&& cat $${tmpf}| jq '.[] | halt_error(length)' \
 	; do \
-		printf "Pods aren't ready. Waiting..\n" > /dev/stderr \
+		printf "${COLOR_DIM}`date`${NO_COLOR} Pods aren't ready yet \n" > /dev/stderr \
 		&& sleep 3; \
-	done
-	printf "${COLOR_GREEN}Cluster ready.${NO_COLOR}\n" > /dev/stderr
+	done \
+	&& printf "$${header} :: Namespace looks ready.${NO_COLOR}\n" \
+		> /dev/stderr
+↪k8s.namespace.wait/%:
+	make k8s.namespace.wait/${*}
+
+# Waits until all pods in every namespace are ready
+k8s.pods.wait_until_ready: k8s.namespace.wait/all
 
 ## END: convenience targets
 ########################################################################
