@@ -50,21 +50,24 @@ $(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/k8s-tools.yml))
 build: 
 	@# Not used from automation, containers are pulled when they change
 	docker compose -f k8s-tools.yml build
-project.show: ▰/base/show
-project.registry:
-	set -x && k3d registry list|grep k3d-docker-io \
-	|| k3d registry create docker-io \
-		-p 3000 \
-		--proxy-remote-url https://registry-1.docker.io \
-		-v ~/.local/share/docker-io-registry:/var/lib/registry
-	# docker compose -f k8s-tools.yml stop -t 1 docker-registry 
-	# docker compose -f k8s-tools.yml up -d docker-registry 
-	# make compose.wait/10
-	# curl -u docker:docker http://localhost:3000/v2
-	# # docker pull distribution/registry:master
-	# curl -u docker:docker http://localhost:3000/v2/_catalog
-project.registry.list:
+# project.registry:
+# 	set -x && k3d registry list|grep k3d-docker-io \
+# 	|| k3d registry create docker-io \
+# 		-p 3000 \
+# 		--proxy-remote-url https://registry-1.docker.io \
+# 		-v ~/.local/share/docker-io-registry:/var/lib/registry
+# 	# docker compose -f k8s-tools.yml stop -t 1 docker-registry 
+# 	# docker compose -f k8s-tools.yml up -d docker-registry 
+# 	# make compose.wait/10
+# 	# curl -u docker:docker http://localhost:3000/v2
+# 	# # docker pull distribution/registry:master
+# 	# curl -u docker:docker http://localhost:3000/v2/_catalog
+# project.registry.list:
 
+k9s/%:
+	make k9s cmd="-n ${*}"
+
+project.show: ▰/base/show
 ↪show:
 	@#
 	echo CLUSTER_NAME=$${CLUSTER_NAME}
@@ -76,7 +79,7 @@ project.registry.list:
 clean: this_cluster.clean compose.clean
 bootstrap: docker.init compose.init this_cluster.bootstrap project.show
 
-deploy: deploy.fission deploy.argo deploy.knative
+deploy: deploy.fission deploy.argo #deploy.knative
 deploy.fission: fission_infra.setup fission_app.setup
 deploy.argo: argo_infra.setup
 deploy.knative: knative_infra.setup 
@@ -84,7 +87,7 @@ deploy.apps: fission_app.setup
 # fission_app.setup 
 # deploy.apps: knative_app.setup
 
-test: this_cluster.test fission_infra.test fission_app.test 
+test: this_cluster.wait fission_infra.test fission_app.test 
 # test: knative_infra.test knative_app.test
 # test: argo_infra.test argo_app.test
 
@@ -92,8 +95,8 @@ test: this_cluster.test fission_infra.test fission_app.test
 ####################################################################################
 # BEGIN: Cluster-ops:: These targets use the `k3d` container
 
-this_cluster.bootstrap: ▰/k3d/this_cluster.setup ▰/k3d/this_cluster.auth ▰/base/this_cluster.test
-this_cluster.test: ▰/base/this_cluster.test
+this_cluster.bootstrap: ▰/k3d/this_cluster.setup ▰/k3d/this_cluster.auth ▰/base/this_cluster.wait
+this_cluster.wait: ▰/base/this_cluster.wait
 this_cluster.clean: ▰/k3d/this_cluster.clean
 ↪this_cluster.clean:
 	k3d cluster delete $${CLUSTER_NAME}
@@ -110,10 +113,8 @@ this_cluster.clean: ▰/k3d/this_cluster.clean
 ↪this_cluster.auth:
 	rmdir $${KUBECONFIG} 2>/dev/null || rm -f $${KUBECONFIG}
 	k3d kubeconfig merge $${CLUSTER_NAME} --output $${KUBECONFIG}
-↪this_cluster.test:
-	#namespace=default make k8s.test_pod.in_namespace
-	set -x && kubectl get pods --all-namespaces -o json \
-		| jq '[.items[].status.containerStatuses[].state|select(.waiting).waiting]'| tee /dev/stderr | jq '.[] | halt_error(length)'
+↪this_cluster.wait: k8s.wait_for_namespace/all
+
 # END: Cluster-ops
 ####################################################################################
 # BEGIN: Fission Infra/Apps :: 
@@ -137,7 +138,7 @@ fission.show: ▰/base/fission.show
 	kubectl get po
 	kubectl get svc 
 	kubens -
-fission_infra.setup: ▰/base/fission_infra.setup compose.wait/30 project.show
+fission_infra.setup: ▰/base/fission_infra.setup this_cluster.wait project.show 
 # fission_infra.teardown: ▰/base/fission_infra.teardown
 # fission_infra.test: ▰/fission/fission_infra.test
 fission_infra.test: ▰/fission/fission_infra.test
@@ -146,21 +147,20 @@ fission_infra.test: ▰/fission/fission_infra.test
 	kubectl config set-context --current --namespace=$$FISSION_NAMESPACE
 	kubectl apply -f https://github.com/fission/fission/releases/download/v1.20.1/fission-all-v1.20.1-minikube.yaml
 	kubectl config set-context --current --namespace=default #to change context to default namespace after installation
+	make k8s.wait_for_namespace/fission 
+	make k8s.wait_for_namespace/default
 # ↪fission_infra.teardown: 
 # 	helm uninstall --namespace=$${FISSION_NAMESPACE} fission
 ↪fission_infra.test: #fission_infra.auth
 	set -x \
 	&& fission version \
 	&& fission check
-
-k9s/%:
-	make k9s cmd="-n ${*}"
 fission_app.setup: fission_infra.test ▰/fission/fission_app.deploy compose.wait/5 fission_app.test
 fission_app.test: ▰/fission/fission_app.test
 ↪fission_app.deploy: k8s.kubens/default
 	( fission env list | grep fission/python-env ) \
 		|| fission env create --name python --image fission/python-env
-↪fission_app.test: k8s.kubens/default
+↪fission_app.test: ↪this_cluster.wait k8s.kubens/default
 	@#
 	set -x && echo $$FUNCTION_NAMESPACE && (fission function list | grep fission-app) \
 		|| fission function create --name fission-app --env python --code src/fission/app.py \
@@ -228,14 +228,14 @@ export ARGO_EVENTS_URL:=https://raw.githubusercontent.com/argoproj/argo-events
 
 # argo: argo_infra argo_app
 
-argo_infra: argo_infra.teardown argo_infra.setup compose.wait/60 argo_infra.test
+# argo_infra: argo_infra.teardown argo_infra.setup compose.wait/60 argo_infra.test
 
-argo_infra.setup: ▰/base/argo_infra.setup_base ▰/base/argo_infra.setup_events 
-↪argo_infra.setup_base: k8s.kubens.create/argo
+argo_infra.setup: ▰/base/argo_infra.workflows ▰/base/argo_infra.events 
+↪argo_infra.workflows: k8s.kubens.create/argo
 	kubectl apply -f https://github.com/argoproj/argo-workflows/releases/download/v3.5.4/install.yaml
 
 # FIXME: pin versions
-↪argo_infra.setup_events: k8s.kubens.create/argo-events
+↪argo_infra.events: k8s.kubens.create/argo-events
 	kubectl apply -f ${ARGO_EVENTS_URL}/stable/manifests/install.yaml
 	kubectl apply -n argo-events -f ${ARGO_EVENTS_URL}/6a44acd1ac57a52/examples/eventbus/native.yaml
 	kubectl apply -n argo-events -f ${ARGO_EVENTS_URL}/6a44acd1ac57a52/examples/event-sources/webhook.yaml

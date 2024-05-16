@@ -249,5 +249,19 @@ k8s.purge.namespaces_by_prefix:
 		> /dev/stderr )\
 	| xargs -n1 -I% bash -x -c "namespace=% make k8s.namespace.purge"
 
+k8s.wait_for_namespace/%:
+	export scope=`[ "${*}" == "all" ] && echo "--all-namespaces" || echo "-n ${*}"` \
+	&& printf "${COLOR_GREEN}Looking for pods in 'waiting' state..${NO_COLOR}\n" > /dev/stderr \
+	&& until \
+		kubectl get pods $${scope} -o json \
+		| jq '[.items[].status.containerStatuses[].state|select(.waiting).waiting]' \
+		| tee /dev/stderr \
+		| jq '.[] | halt_error(length)' \
+	; do \
+		printf "Pods aren't ready. Waiting..\n" > /dev/stderr \
+		&& sleep 3; \
+	done
+	printf "${COLOR_GREEN}Cluster ready.${NO_COLOR}\n" > /dev/stderr
+
 ## END: convenience targets
 ########################################################################
