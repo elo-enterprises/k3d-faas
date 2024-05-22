@@ -1,195 +1,283 @@
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/8456633/59972109-8e9c8480-95cc-11e9-8350-38f7f86ba76d.png">
+</p>
 
-<table style="width:100%">
-  <tr>
-    <td colspan=2><strong>
-    k3d-faas
-      </strong>&nbsp;&nbsp;&nbsp;&nbsp;
-    </td>
-  </tr>
-  <tr>
-    <td width=15%><img src=img/icon.png style="width:150px"></td>
-    <td>
-      Laboratory for working with Functions as a Service on kubernetes
-      <br/><br/>
-      <a href="https://github.com/elo-enterprises/k3d-faas/actions/workflows/docker-test.yml"><img src="https://github.com/elo-enterprises/k3d-faas/actions/workflows/docker-test.yml/badge.svg"></a>
-    </td>
-  </tr>
-</table>
+A simple terminal UI for both docker and docker-compose, written in Go with the [gocui](https://github.com/jroimartin/gocui 'gocui') library.
 
--------------------------------------------------------------
+![CI](https://github.com/jesseduffield/lazygit/workflows/Continuous%20Integration/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jesseduffield/lazydocker)](https://goreportcard.com/report/github.com/jesseduffield/lazydocker)
+[![GolangCI](https://golangci.com/badges/github.com/jesseduffield/lazydocker.svg)](https://golangci.com)
+[![GoDoc](https://godoc.org/github.com/jesseduffield/lazydocker?status.svg)](http://godoc.org/github.com/jesseduffield/lazydocker)
+![GitHub repo size](https://img.shields.io/github/repo-size/jesseduffield/lazydocker)
+[![GitHub Releases](https://img.shields.io/github/downloads/jesseduffield/lazydocker/total)](https://github.com/jesseduffield/lazydocker/releases)
+[![GitHub tag](https://img.shields.io/github/tag/jesseduffield/lazydocker.svg)](https://github.com/jesseduffield/lazydocker/releases/latest)
+[![homebrew](https://img.shields.io/homebrew/v/lazydocker)](https://github.com/Homebrew/homebrew-core/blob/master/Formula/lazydocker.rb)
 
-<div class="toc">
-<ul>
-<li><a href="#overview">Overview</a></li>
-<li><a href="#features">Features</a></li>
-<li><a href="#quick-start">Quick Start</a><ul>
-<li><a href="#clonebuildtest-this-repo">Clone/Build/Test This Repo</a></li>
-</ul>
-</li>
-<li><a href="#references">References</a></li>
-<li><a href="#known-limitations-and-issues">Known Limitations and Issues</a></li>
-</ul>
-</div>
+![Gif](/docs/resources/demo3.gif)
 
+[Demo](https://youtu.be/NICqQPxwJWw)
 
--------------------------------------------------------------
+## Sponsors
 
-## Overview
+<p align="center">
+ Maintenance of this project is made possible by all the <a href="https://github.com/jesseduffield/lazydocker/graphs/contributors">contributors</a> and <a href="https://github.com/sponsors/jesseduffield">sponsors</a>. If you'd like to sponsor this project and have your avatar or company logo appear below <a href="https://github.com/sponsors/jesseduffield">click here</a>. 💙
+</p>
 
-A self-contained, batteries-included environment / workbench for prototyping Functions-as-a-Service stuff on Kubernetes.  
+<p align="center">
+<!-- sponsors --><a href="https://github.com/intabulas"><img src="https://github.com/intabulas.png" width="60px" alt="" /></a><a href="https://github.com/peppy"><img src="https://github.com/peppy.png" width="60px" alt="" /></a><a href="https://github.com/piot"><img src="https://github.com/piot.png" width="60px" alt="" /></a><a href="https://github.com/rgwood"><img src="https://github.com/rgwood.png" width="60px" alt="" /></a><a href="https://github.com/oliverguenther"><img src="https://github.com/oliverguenther.png" width="60px" alt="" /></a><a href="https://github.com/pawanjay176"><img src="https://github.com/pawanjay176.png" width="60px" alt="" /></a><a href="https://github.com/bdach"><img src="https://github.com/bdach.png" width="60px" alt="" /></a><a href="https://github.com/davidklsn"><img src="https://github.com/davidklsn.png" width="60px" alt="" /></a><a href="https://github.com/jryom"><img src="https://github.com/jryom.png" width="60px" alt="" /></a><a href="https://github.com/carstengehling"><img src="https://github.com/carstengehling.png" width="60px" alt="" /></a><a href="https://github.com/ceuk"><img src="https://github.com/ceuk.png" width="60px" alt="" /></a><a href="https://github.com/akospwc"><img src="https://github.com/akospwc.png" width="60px" alt="" /></a><a href="https://github.com/Xetera"><img src="https://github.com/Xetera.png" width="60px" alt="" /></a><a href="https://github.com/HoldenLucas"><img src="https://github.com/HoldenLucas.png" width="60px" alt="" /></a><a href="https://github.com/barbados-clemens"><img src="https://github.com/barbados-clemens.png" width="60px" alt="" /></a><a href="https://github.com/nartc"><img src="https://github.com/nartc.png" width="60px" alt="" /></a><a href="https://github.com/matejcik"><img src="https://github.com/matejcik.png" width="60px" alt="" /></a><a href="https://github.com/lucatume"><img src="https://github.com/lucatume.png" width="60px" alt="" /></a><a href="https://github.com/zach-fuller"><img src="https://github.com/zach-fuller.png" width="60px" alt="" /></a><a href="https://github.com/nicholascloud"><img src="https://github.com/nicholascloud.png" width="60px" alt="" /></a><a href="https://github.com/PhotonQuantum"><img src="https://github.com/PhotonQuantum.png" width="60px" alt="" /></a><a href="https://github.com/ava1ar"><img src="https://github.com/ava1ar.png" width="60px" alt="" /></a><a href="https://github.com/pedropombeiro"><img src="https://github.com/pedropombeiro.png" width="60px" alt="" /></a><a href="https://github.com/minidfx"><img src="https://github.com/minidfx.png" width="60px" alt="" /></a><a href="https://github.com/JoeKlemmer"><img src="https://github.com/JoeKlemmer.png" width="60px" alt="" /></a><a href="https://github.com/ColonelBucket8"><img src="https://github.com/ColonelBucket8.png" width="60px" alt="" /></a><a href="https://github.com/ComplexPlane"><img src="https://github.com/ComplexPlane.png" width="60px" alt="" /></a><a href="https://github.com/tobi"><img src="https://github.com/tobi.png" width="60px" alt="" /></a><a href="https://github.com/benbfortis"><img src="https://github.com/benbfortis.png" width="60px" alt="" /></a><a href="https://github.com/jakewarren"><img src="https://github.com/jakewarren.png" width="60px" alt="" /></a><a href="https://github.com/tgpholly"><img src="https://github.com/tgpholly.png" width="60px" alt="" /></a><a href="https://github.com/jisantuc"><img src="https://github.com/jisantuc.png" width="60px" alt="" /></a><a href="https://github.com/bitprophet"><img src="https://github.com/bitprophet.png" width="60px" alt="" /></a><a href="https://github.com/tayleighr"><img src="https://github.com/tayleighr.png" width="60px" alt="" /></a><a href="https://github.com/Novakov"><img src="https://github.com/Novakov.png" width="60px" alt="" /></a><a href="https://github.com/mthuggett"><img src="https://github.com/mthuggett.png" width="60px" alt="" /></a><a href="https://github.com/farzadmf"><img src="https://github.com/farzadmf.png" width="60px" alt="" /></a><a href="https://github.com/nekhaevskiy"><img src="https://github.com/nekhaevskiy.png" width="60px" alt="" /></a><a href="https://github.com/reivilibre"><img src="https://github.com/reivilibre.png" width="60px" alt="" /></a><a href="https://github.com/andreaskurth"><img src="https://github.com/andreaskurth.png" width="60px" alt="" /></a><a href="https://github.com/BSteffaniak"><img src="https://github.com/BSteffaniak.png" width="60px" alt="" /></a><a href="https://github.com/jordan-gillard"><img src="https://github.com/jordan-gillard.png" width="60px" alt="" /></a><a href="https://github.com/smangels"><img src="https://github.com/smangels.png" width="60px" alt="" /></a><a href="https://github.com/George-Spanos"><img src="https://github.com/George-Spanos.png" width="60px" alt="" /></a><a href="https://github.com/BenGH28"><img src="https://github.com/BenGH28.png" width="60px" alt="" /></a><a href="https://github.com/abradner"><img src="https://github.com/abradner.png" width="60px" alt="" /></a><a href="https://github.com/frantisekstanko"><img src="https://github.com/frantisekstanko.png" width="60px" alt="" /></a><a href="https://github.com/robclancy"><img src="https://github.com/robclancy.png" width="60px" alt="" /></a><a href="https://github.com/tkuraku"><img src="https://github.com/tkuraku.png" width="60px" alt="" /></a><a href="https://github.com/amslezak"><img src="https://github.com/amslezak.png" width="60px" alt="" /></a><a href="https://github.com/mkock"><img src="https://github.com/mkock.png" width="60px" alt="" /></a><a href="https://github.com/screendriver"><img src="https://github.com/screendriver.png" width="60px" alt="" /></a><a href="https://github.com/MichalKolasinski"><img src="https://github.com/MichalKolasinski.png" width="60px" alt="" /></a><a href="https://github.com/slieschke"><img src="https://github.com/slieschke.png" width="60px" alt="" /></a><a href="https://github.com/byebyebruce"><img src="https://github.com/byebyebruce.png" width="60px" alt="" /></a><a href="https://github.com/tonkatsuki"><img src="https://github.com/tonkatsuki.png" width="60px" alt="" /></a><a href="https://github.com/illarionvk"><img src="https://github.com/illarionvk.png" width="60px" alt="" /></a><a href="https://github.com/leandronowras"><img src="https://github.com/leandronowras.png" width="60px" alt="" /></a><a href="https://github.com/Bebolicious"><img src="https://github.com/Bebolicious.png" width="60px" alt="" /></a><a href="https://github.com/WhiteBlackGoose"><img src="https://github.com/WhiteBlackGoose.png" width="60px" alt="" /></a><!-- sponsors -->
+</p>
 
-* Uses [k3d](http://k3d.io) for project-local clusters (no existing cluster required)
-* Uses [k8s-tools](https://github.com/elo-enterprises/k8s-tools) for [project automation](Makefile)
-* Multiple backends for easy experimentation
-    * [Fission](https://fission.io/docs)
-    * [Knative-Events](https://knative.dev/docs)
-    * [Argo-Events](#)
+## Elevator Pitch
 
-**Besides a localhost-friendly cluster, there are no build dependencies at all except for docker.**  All of k3d/helm/kubectl & knative/argo/fission CLIs use independently versioned containers, starting with the alpine-k8s base.  The entire stack in this repository is exercised by tests with github actions, and should work anywhere else that is configured for docker-in-docker support.
+Minor rant incoming: Something's not working? Maybe a service is down. `docker-compose ps`. Yep, it's that microservice that's still buggy. No issue, I'll just restart it: `docker-compose restart`. Okay now let's try again. Oh wait the issue is still there. Hmm. `docker-compose ps`. Right so the service must have just stopped immediately after starting. I probably would have known that if I was reading the log stream, but there is a lot of clutter in there from other services. I could get the logs for just that one service with `docker compose logs --follow myservice` but that dies everytime the service dies so I'd need to run that command every time I restart the service. I could alternatively run `docker-compose up myservice` and in that terminal window if the service is down I could just `up` it again, but now I've got one service hogging a terminal window even after I no longer care about its logs. I guess when I want to reclaim the terminal realestate I can do `ctrl+P,Q`, but... wait, that's not working for some reason. Should I use ctrl+C instead? I can't remember if that closes the foreground process or kills the actual service.
 
-**This is intended to be a solid reference architecture for cluster-bootstrapping**, but it's mainly for experiments/benchmarking and isn't exactly what you would call production-ready.  But it's a good start for further iteration, because it's easy to yank out the components you don't need and customize the ones you want to keep.  
+What a headache!
 
-* **To point this automation at an existing cluster,** just disable the k3d bootstrap and use a different KUBECONFIG.
-* **Keeping the from-scratch cluster build but switching the backend from k3d to something like EKS** should also be fairly straightforward.  
-* **Event-sourcing from something like SQS takes more signficant effort,** but hopefully the automation layout makes it clear how to get started.
+Memorising docker commands is hard. Memorising aliases is slightly less hard. Keeping track of your containers across multiple terminal windows is near impossible. What if you had all the information you needed in one terminal window with every common command living one keypress away (and the ability to add custom commands as well). Lazydocker's goal is to make that dream a reality.
 
--------------------------------------------------------------
+- [Requirements](https://github.com/jesseduffield/lazydocker#requirements)
+- [Installation](https://github.com/jesseduffield/lazydocker#installation)
+- [Usage](https://github.com/jesseduffield/lazydocker#usage)
+- [Keybindings](/docs/keybindings)
+- [Cool Features](https://github.com/jesseduffield/lazydocker#cool-features)
+- [Contributing](https://github.com/jesseduffield/lazydocker#contributing)
+- [Video Tutorial](https://youtu.be/NICqQPxwJWw)
+- [Config Docs](/docs/Config.md)
+- [Twitch Stream](https://www.twitch.tv/jesseduffield)
+- [FAQ](https://github.com/jesseduffield/lazydocker#faq)
 
-## Features
+## Requirements
 
-* Bundles Fission, Knative, Argo & OpenWhisk CLI tools.  
-    * You can use those CLIs with the local deployments infrastructure, or against existing deployments.
-* E2E demo for basic Fission infrastructure & application deployment
-* E2E demo for basic Knative infrastructure deployment *(app coming soon)*
+- Docker >= **1.13** (API >= **1.25**)
+- Docker-Compose >= **1.23.2** (optional)
 
-* E2E demo for basic Argo infrastructure deployment *(app coming soon)*
+## Installation
 
--------------------------------------------------------------
+### Homebrew
 
-## Quick Start
+Normally `lazydocker` formula can be found in the Homebrew core but we suggest you to tap our formula to get frequently updated one. It works with Linux, too.
 
-### Clone/Build/Test This Repo
-
-```bash
-# for ssh
-$ git clone git@github.com:elo-enterprises/k3d-faas.git
-
-# or for http
-$ git clone https://github.com/elo-enterprises/k3d-faas
-
-# teardown, setup, and exercise the entire stack
-$ make clean bootstrap deploy test
-
-# teardown/setup just the cluster
-$ make clean bootstrap
-INFO[0000] No clusters found                            
-Docker version 26.1.2, build 211e74b
-k3d version v5.6.3
-k3s version v1.28.8-k3s1 (default)
-INFO[0000] Using config file faas.cluster.k3d.yaml (k3d.io/v1alpha5#simple) 
-INFO[0000] portmapping '8080:80' targets the loadbalancer: defaulting to [servers:*:proxy agents:*:proxy] 
-INFO[0000] Prep: Network                                
-INFO[0000] Created network 'k3d-faas'                   
-INFO[0000] Created image volume k3d-faas-images         
-INFO[0000] Creating node 'docker-io'                    
-INFO[0000] Successfully created registry 'docker-io'    
-INFO[0000] Starting new tools node...                   
-INFO[0000] Creating initializing server node            
-INFO[0000] Creating node 'k3d-faas-server-0'            
-INFO[0000] Starting node 'k3d-faas-tools'               
-INFO[0001] Creating node 'k3d-faas-server-1'            
-INFO[0002] Creating node 'k3d-faas-server-2'            
-INFO[0002] Creating node 'k3d-faas-agent-0'             
-INFO[0002] Creating node 'k3d-faas-agent-1'             
-INFO[0002] Creating node 'k3d-faas-agent-2'             
-INFO[0002] Creating node 'k3d-faas-agent-3'             
-INFO[0002] Creating node 'k3d-faas-agent-4'             
-INFO[0002] Creating node 'k3d-faas-agent-5'             
-INFO[0002] Creating node 'k3d-faas-agent-6'             
-INFO[0002] Creating LoadBalancer 'k3d-faas-serverlb'    
-INFO[0002] Using the k3d-tools node to gather environment information 
-INFO[0002] HostIP: using network gateway 192.168.192.1 address 
-INFO[0002] Starting cluster 'faas'                      
-INFO[0002] Starting the initializing server...          
-INFO[0002] Starting node 'k3d-faas-server-0'            
-INFO[0005] Starting servers...                          
-INFO[0005] Starting node 'k3d-faas-server-1'            
-INFO[0026] Starting node 'k3d-faas-server-2'            
-INFO[0042] Starting agents...                           
-INFO[0043] Starting node 'k3d-faas-agent-3'             
-INFO[0043] Starting node 'k3d-faas-agent-4'             
-INFO[0043] Starting node 'k3d-faas-agent-5'             
-INFO[0043] Starting node 'k3d-faas-agent-1'             
-INFO[0043] Starting node 'k3d-faas-agent-0'             
-INFO[0043] Starting node 'k3d-faas-agent-6'             
-INFO[0043] Starting node 'k3d-faas-agent-2'             
-INFO[0049] Starting helpers...                          
-INFO[0049] Starting node 'docker-io'                    
-INFO[0049] Starting node 'k3d-faas-serverlb'            
-INFO[0055] Injecting records for hostAliases (incl. host.k3d.internal) and for 12 network members into CoreDNS configmap... 
-INFO[0058] Cluster 'faas' created successfully!         
-INFO[0058] You can now use it like this:                
-kubectl cluster-info
-./faas.profile.yaml
-CLUSTER_NAME=faas
-CLUSTER_CONFIG=faas.cluster.k3d.yaml
-KUBECONFIG=./faas.profile.yaml
-Kubernetes control plane is running at https://0.0.0.0:6551
-CoreDNS is running at https://0.0.0.0:6551/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
-Metrics-server is running at https://0.0.0.0:6551/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy
-
-To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
-NAME                STATUS   ROLES                       AGE   VERSION
-k3d-faas-agent-0    Ready    <none>                      32s   v1.28.8+k3s1
-k3d-faas-agent-1    Ready    <none>                      33s   v1.28.8+k3s1
-k3d-faas-agent-2    Ready    <none>                      32s   v1.28.8+k3s1
-k3d-faas-agent-3    Ready    <none>                      33s   v1.28.8+k3s1
-k3d-faas-agent-4    Ready    <none>                      33s   v1.28.8+k3s1
-k3d-faas-agent-5    Ready    <none>                      32s   v1.28.8+k3s1
-k3d-faas-agent-6    Ready    <none>                      31s   v1.28.8+k3s1
-k3d-faas-server-0   Ready    control-plane,etcd,master   71s   v1.28.8+k3s1
-k3d-faas-server-1   Ready    control-plane,etcd,master   54s   v1.28.8+k3s1
-k3d-faas-server-2   Ready    control-plane,etcd,master   37s   v1.28.8+k3s1
-NAME              STATUS   AGE
-default           Active   73s
-kube-node-lease   Active   73s
-kube-public       Active   73s
-kube-system       Active   73s
-
-
-# piecewise setup / teardown for infrastructure and apps
-$ make knative
-$ make argo
-$ make fission
-
-# equivalently, with more granularity:
-$ make knative_infra.teardown knative_infra.setup knative_app.setup
-$ make argo.teardown argo.setup argo_app.setup
-$ make fission_infra.teardown fission_infra.setup fission_app.setup
-
-# test infrastructure components piecewise
-make fission_infra.test
-make knative_infra.test
-make argo_infra.test
-
-# test application components piecewise
-make fission_app.test
-make knative_app.test
-make argo_app.test
+**Tap**:
+```sh
+brew install jesseduffield/lazydocker/lazydocker
 ```
 
--------------------------------------------------------------
+**Core**:
+```sh
+brew install lazydocker
+```
 
-# References
+### Scoop (Windows)
 
-1. https://argoproj.github.io/argo-events/installation/
-1. <https://danquack.dev/blog/creating-faas-in-k8s-with-argo-events>
+You can install `lazydocker` using [scoop](https://scoop.sh/):
 
--------------------------------------------------------------
+```sh
+scoop install lazydocker
+```
+### Chocolatey (Windows)
 
-# Known Limitations and Issues
+You can install `lazydocker` using [Chocolatey](https://chocolatey.org/):
 
-1. Placeholder
-1. Placeholder
-1. Placeholder
+```sh
+choco install lazydocker
+```
+### asdf-vm
 
+You can install [asdf-lazydocker plugin](https://github.com/comdotlinux/asdf-lazydocker) using [asdf-vm](https://asdf-vm.com/):
+#### Setup (Once)
+```sh
+asdf plugin add lazydocker https://github.com/comdotlinux/asdf-lazydocker.git
+```
+
+#### For Install / Upgrade
+```sh
+asdf list all lazydocker
+asdf install lazydocker latest
+asdf global lazydocker latest
+```
+
+### Binary Release (Linux/OSX/Windows)
+
+You can manually download a binary release from [the release page](https://github.com/jesseduffield/lazydocker/releases).
+
+Automated install/update, don't forget to always verify what you're piping into bash:
+
+```sh
+curl https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
+```
+The script installs downloaded binary to `$HOME/.local/bin` directory by default, but it can be changed by setting `DIR` environment variable.
+
+### Go
+
+Required Go Version >= **1.16**
+
+```sh
+go install github.com/jesseduffield/lazydocker@latest
+```
+
+Required Go version >= **1.8**, <= **1.17**
+
+```sh
+go get github.com/jesseduffield/lazydocker
+```
+
+### Arch Linux AUR
+
+You can install lazydocker using the [AUR](https://aur.archlinux.org/packages/lazydocker) by running:
+
+```sh
+yay -S lazydocker
+```
+
+### Docker
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/lazyteam/lazydocker.svg)](https://hub.docker.com/r/lazyteam/lazydocker)
+[![Docker Stars](https://img.shields.io/docker/stars/lazyteam/lazydocker.svg)](https://hub.docker.com/r/lazyteam/lazydocker)
+[![Docker Automated](https://img.shields.io/docker/cloud/automated/lazyteam/lazydocker.svg)](https://hub.docker.com/r/lazyteam/lazydocker)
+
+1. <details><summary>Click if you have an ARM device</summary><p>
+
+    - If you have a ARM 32 bit v6 architecture
+
+        ```sh
+        docker build -t lazyteam/lazydocker \
+        --build-arg BASE_IMAGE_BUILDER=arm32v6/golang \
+        --build-arg GOARCH=arm \
+        --build-arg GOARM=6 \
+        https://github.com/jesseduffield/lazydocker.git
+        ```
+
+    - If you have a ARM 32 bit v7 architecture
+
+        ```sh
+        docker build -t lazyteam/lazydocker \
+        --build-arg BASE_IMAGE_BUILDER=arm32v7/golang \
+        --build-arg GOARCH=arm \
+        --build-arg GOARM=7 \
+        https://github.com/jesseduffield/lazydocker.git
+        ```
+
+    - If you have a ARM 64 bit v8 architecture
+
+        ```sh
+        docker build -t lazyteam/lazydocker \
+        --build-arg BASE_IMAGE_BUILDER=arm64v8/golang \
+        --build-arg GOARCH=arm64 \
+        https://github.com/jesseduffield/lazydocker.git
+        ```
+
+    </p></details>
+
+1. Run the container
+
+    ```sh
+    docker run --rm -it -v \
+    /var/run/docker.sock:/var/run/docker.sock \
+    -v /yourpath:/.config/jesseduffield/lazydocker \
+    lazyteam/lazydocker
+    ```
+
+    - Don't forget to change `/yourpath` to an actual path you created to store lazydocker's config
+    - You can also use this [docker-compose.yml](https://github.com/jesseduffield/lazydocker/blob/master/docker-compose.yml)
+    - You might want to create an alias, for example:
+
+        ```sh
+        echo "alias lzd='docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock -v /yourpath/config:/.config/jesseduffield/lazydocker lazyteam/lazydocker'" >> ~/.zshrc
+        ```
+
+
+
+For development, you can build the image using:
+
+```sh
+git clone https://github.com/jesseduffield/lazydocker.git
+cd lazydocker
+docker build -t lazyteam/lazydocker \
+    --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
+    --build-arg VCS_REF=`git rev-parse --short HEAD` \
+    --build-arg VERSION=`git describe --abbrev=0 --tag` \
+    .
+```
+
+If you encounter a compatibility issue with Docker bundled binary, try rebuilding
+the image with the build argument `--build-arg DOCKER_VERSION="v$(docker -v | cut -d" " -f3 | rev | cut -c 2- | rev)"`
+so that the bundled docker binary matches your host docker binary version.
+
+
+## Usage
+
+Call `lazydocker` in your terminal. I personally use this a lot so I've made an alias for it like so:
+
+```
+echo "alias lzd='lazydocker'" >> ~/.zshrc
+```
+
+(you can substitute .zshrc for whatever rc file you're using)
+
+- Basic video tutorial [here](https://youtu.be/NICqQPxwJWw).
+- List of keybindings
+  [here](/docs/keybindings).
+
+## Cool features
+
+everything is one keypress away (or one click away! Mouse support FTW):
+
+- viewing the state of your docker or docker-compose container environment at a glance
+- viewing logs for a container/service
+- viewing ascii graphs of your containers' metrics so that you can not only feel but also look like a developer
+- customising those graphs to measure nearly any metric you want
+- attaching to a container/service
+- restarting/removing/rebuilding containers/services
+- viewing the ancestor layers of a given image
+- pruning containers, images, or volumes that are hogging up disk space
+
+## Contributing
+
+There is still a lot of work to go! Please check out the [contributing guide](CONTRIBUTING.md).
+For contributor discussion about things not better discussed here in the repo, join the discord channel
+
+<a href="https://discord.gg/ehwFt2t4wt"><img src='/docs/resources/discord.png' width='75'></a>
+
+## Donate
+
+If you would like to support the development of lazydocker, consider [sponsoring me](https://github.com/sponsors/jesseduffield) (github is matching all donations dollar-for-dollar for 12 months)
+
+## Social
+
+If you want to see what I (Jesse) am up to in terms of development, follow me on
+[twitter](https://twitter.com/DuffieldJesse) or watch me program on
+[twitch](https://www.twitch.tv/jesseduffield)
+
+## FAQ
+
+### How do I edit my config?
+
+By opening lazydocker, clicking on the 'project' panel in the top left, and pressing 'o' (or 'e' if your editor is vim). See [Config Docs](/docs/Config.md)
+
+### How do I get text to wrap in my main panel?
+
+In the future I want to make this the default, but for now there are some CPU issues that arise with wrapping. If you want to enable wrapping, use `gui.wrapMainPanel: true`
+
+### How do you select text?
+
+Because we support mouse events, you will need to hold option while dragging the mouse to indicate you're trying to select text rather than click on something. Alternatively you can disable mouse events via the `gui.ignoreMouseEvents` config value.
+
+Mac Users: See [Issue #190](https://github.com/jesseduffield/lazydocker/issues/190) for other options.
+
+### Why can't I see my container's logs?
+
+By default we only show logs from the last hour, so that we're not putting too much strain on the machine. This may be why you can't see logs when you first start lazydocker. This can be overwritten in the config's `commandTemplates`
+
+If you are running lazydocker in Docker container, it is a know bug, that you can't see logs or CPU usage.
+
+### Why isn't my docker-compose environment being used?
+
+By default Compose V1 (`docker-compose` with the hyphen) is used as the docker-compose command. You will need to make sure you have the `docker-compose` command available for lazydocker to be able to use.
+
+If you use Compose V2 (`docker compose` without the hyphen), alternatively, you can change the docker-compose command used via the `commandTemplates.dockerCompose` config value.
+
+## Alternatives
+
+- [docui](https://github.com/skanehira/docui) - Skanehira beat me to the punch on making a docker terminal UI, so definitely check out that repo as well! I think the two repos can live in harmony though: lazydocker is more about managing existing containers/services, and docui is more about creating and configuring them.
+- [Portainer](https://github.com/portainer/portainer) - Portainer tries to solve the same problem but it's accessed via your browser rather than your terminal. It also supports docker swarm.
+- See [Awesome Docker list](https://github.com/veggiemonk/awesome-docker/blob/master/README.md#terminal) for similar tools to work with Docker.

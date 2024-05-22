@@ -67,6 +67,7 @@ $ git clone {{github.repo_url}}
 
 # teardown, setup, and exercise the entire stack
 $ make clean bootstrap deploy test
+# make clean bootstrap deploy.fission compose.wait/20 test.fission
 
 # teardown & setup just for the k3d cluster
 $ make clean bootstrap
@@ -83,9 +84,9 @@ $ make argo.teardown argo.setup argo_app.setup
 $ make fission_infra.teardown fission_infra.setup fission_app.setup
 
 # test infrastructure components piecewise
-make fission_infra.test
-make knative_infra.test
-make argo_infra.test
+make test.fission
+make test.knative
+make test.argo
 
 # test application components piecewise
 make fission_app.test

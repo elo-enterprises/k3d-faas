@@ -6,39 +6,45 @@ services:
     image: k8s:base
     build:
       context: .
+      args: 
+        DOCKER_UID: ${DOCKER_UID}
+        DOCKER_GID: ${DOCKER_GID}
+        DOCKER_UGNAME: ${DOCKER_UGNAME}
       dockerfile_inline: |
-        #ARG USER_UID=1000
-        #ARG GROUP_GID=1000
         FROM alpine/k8s:1.30.0 as builder
-        RUN apk --no-cache add procps make
+        RUN apk --no-cache add procps make 
         RUN cp /krew-* /usr/bin/krew
         RUN KREW_ROOT=/tmp krew install ctx
         RUN KREW_ROOT=/tmp krew install ns
         RUN mv /tmp/bin/kubectl-ns /bin/kubens
         RUN mv /tmp/bin/kubectl-ctx /bin/kubectx
         FROM alpine/k8s:1.30.0 
-        RUN apk add --no-cache ncurses # required for 'tput', which kubens and kubectx use
         COPY --from=builder /usr/bin/make /bin/ps /bin/kubens /bin/kubectx /bin
+        RUN apk --no-cache add ncurses shadow
+        RUN groupadd --gid ${DOCKER_GID} docker
+        RUN useradd --uid ${DOCKER_UID} --create-home -g docker ${DOCKER_UGNAME} 
+        USER ${DOCKER_UGNAME}
+    user: ${DOCKER_UID}:${DOCKER_GID}
     network_mode: host
     working_dir: /workspace
     volumes:
       # NB: something like this if you're working with EKS and need AWS creds
-      # - ${HOME}/.aws:/root/.aws
+      # - ${HOME}/.aws:/home/user/.aws
       # NB: something like this if you only want to share one file.
       # - "${KUBECONFIG}:/kubeconfig.conf:ro"
       # NB: `.cache` and `.config` as below are used by helm, maybe others?
       - ${PWD}:/workspace
-      - ${HOME}/.kube:/root/.kube
-      - ${HOME}/.krew:/root/.krew
+      - ${HOME}/.kube:/home/user/.kube
+      - ${HOME}/.krew:/home/user/.krew
       # used by helm, maybe others
-      - ${HOME}/.cache:/root/.cache
-      - ${HOME}/.config/helm:/root/.config/helm
-      - ${HOME}/.local:/root/.local:ro
+      - ${HOME}/.cache:/home/user/.cache
+      - ${HOME}/.config/helm:/home/user/.config/helm
+      - ${HOME}/.local:/home/user/.local:ro
       - /var/run/docker.sock:/var/run/docker.sock
     tty: true 
     environment:
       KUBECONFIG: "${KUBECONFIG}"
-      KREW_ROOT: /root/.krew
+      KREW_ROOT: /home/user/.krew
 
   # https://helm.sh/docs/
   helm:
@@ -117,9 +123,9 @@ services:
         FROM ghcr.io/knative/func/func as builder
         FROM gcr.io/knative-releases/knative.dev/client/cmd/kn:latest
         COPY --from=builder /ko-app/func /ko-app/func
-        COPY --from=base /usr/bin/kubectl /usr/bin/kubectl
+        COPY --from=base /usr/bin/kubectl /usr/bin/
         RUN apk --no-cache add bash procps make
-        RUN cp /ko-app/func /usr/local/bin/kn-func
+        RUN cp /ko-app/func /usr/bin/kn-func
 
   # https://github.com/arttor/helmify
   helmify:
@@ -147,9 +153,11 @@ services:
       context: .
       dockerfile_inline: |
         FROM k8s:base
+        USER root 
         RUN curl -s -Lo fission \
             https://github.com/fission/fission/releases/download/v1.20.1/fission-v1.20.1-linux-amd64
         RUN chmod +x fission && mv fission /usr/local/bin/
+        USER user
     entrypoint: fission
 
 
@@ -162,11 +170,14 @@ services:
       context: .
       dockerfile_inline: |
         FROM k8s:base
+        USER root 
         RUN curl -L https://github.com/kubernetes/kompose/releases/download/v1.33.0/kompose-linux-amd64 -o /usr/bin/kompose
         RUN chmod ugo+x /usr/bin/kompose
+        USER user
     entrypoint: kompose
   
   # https://argo-workflows.readthedocs.io/en/latest/walk-through/argo-cli/
+  # FIXME: pin version
   argo:
     <<: *base 
     depends_on: ['base']
@@ -180,6 +191,7 @@ services:
     entrypoint: argo 
   
   # https://github.com/txn2/kubefwd
+  # FIXME: pin version
   kubefwd:
     <<: *base 
     depends_on: ['base']
@@ -200,7 +212,9 @@ services:
       context: .
       dockerfile_inline: |
         FROM k8s:base
+        USER root
         RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.6.3 bash
+        USER user
     entrypoint: k3d
   
   # https://github.com/charmbracelet/vhs

@@ -32,10 +32,12 @@ agents: 7
 #         endpoint:
 #           - http://docker-io:5000
 
-# kubeAPI: # same as `--api-port myhost.my.domain:6445` (where the name would resolve to 127.0.0.1)
+# same as `--api-port myhost.my.domain:6445` (where the name would resolve to 127.0.0.1)
 #   host: "myhost.my.domain" # important for the `server` setting in the kubeconfig
 #   hostIP: "127.0.0.1" # where the Kubernetes API will be listening on
-#   hostPort: "6445" # where the Kubernetes API listening port will be mapped to on your host system
+  # where the Kubernetes API listening port will be mapped to on your host system
+kubeAPI: 
+  hostPort: "6551" 
 
 # image: rancher/k3s:v1.20.4-k3s1 # same as `--image rancher/k3s:v1.20.4-k3s1`
 # network: my-custom-net # same as `--network my-custom-net`
@@ -47,10 +49,11 @@ agents: 7
 #     nodeFilters:
 #       - server:0
 #       - agent:*
-# ports:
-#   - port: 8080:80 # same as `--port '8080:80@loadbalancer'`
-#     nodeFilters:
-#       - loadbalancer
+# same as `--port '8080:80@loadbalancer'`
+ports:
+  - port: 8080:80 
+    nodeFilters:
+      - loadbalancer
 # env:
 #   - envVar: bar=baz # same as `--env 'bar=baz@server:0'`
 #     nodeFilters:
@@ -63,9 +66,11 @@ agents: 7
 #   - ip: 1.1.1.1
 #     hostnames:
 #       - cloud.flare.dns
+ # k3d runtime settings
+  # wait for cluster to be usable before returning; same as `--wait` options:
 # options:
-#   k3d: # k3d runtime settings
-#     wait: true # wait for cluster to be usable before returning; same as `--wait` (default: true)
+#   k3d:
+#     wait: true(default: true)
 #     timeout: "60s" # wait timeout before aborting; same as `--timeout 60s`
 #     disableLoadbalancer: false # same as `--no-lb`
 #     disableImageVolume: false # same as `--no-image-volume`
