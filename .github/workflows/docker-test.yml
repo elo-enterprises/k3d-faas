@@ -25,7 +25,7 @@ jobs:
       - name: Build
         run: make build
       - name: Bootstrap Cluster
-        run: make boostrap
+        run: make bootstrap
       - name: Deploy
         run: make deploy
       - name: Test
