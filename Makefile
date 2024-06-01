@@ -39,6 +39,7 @@ export CLUSTER_CONFIG?=faas.cluster.k3d.yaml
 
 # always use a local profile, ignoring whatever is in the parent environment
 export KUBECONFIG:=./${CLUSTER_NAME}.profile.yaml
+_:=$(shell umask 066;touch ${KUBECONFIG})
 
 # NB: `FUNCTION_NAMESPACE` only used in older versions of fission?
 # NB: `FISSION_CLI_VERSION` is not DRY with k8s-tools/fission container 
