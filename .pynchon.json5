@@ -1,0 +1,7 @@
+// configuration for pynchon (a docs-generation tool )
+{
+  "plugins": ["vhs"],
+  "jinja": {
+    "template_includes": ['docs/']
+  },
+}

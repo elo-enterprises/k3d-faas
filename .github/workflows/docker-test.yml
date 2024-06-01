@@ -9,20 +9,24 @@ on:
     branches: [ "master" ]
     paths-ignore:
       - '**.md'
+      - '**.md.j2'
       - '**.png'
+      - '**.gif'
 permissions:
   contents: read
 jobs:
   test:
-    name: Test
+    name: Integration/Smoke/E2E Testing
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Initialize
-        run: make clean
+        run: make clean init
       - name: Build
+        run: make build
+      - name: Bootstrap Cluster
         run: make bootstrap
-      - name: Integration Tests
+      - name: Deploy
         run: make deploy
-      - name: Smoke Tests
+      - name: Test
         run: make test

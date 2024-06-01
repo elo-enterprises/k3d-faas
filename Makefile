@@ -12,7 +12,7 @@
 #   into the containers described inside `k8s-tools.yml`. See the full 
 #   docs here[1].  Summarizing calling conventions: targets written like
 #   "▰/myservice/target_name" describe a callback so that container 
-#   "myservice" will run "make ↪target_name".
+#   "myservice" will run "make .target_name".
 #
 # REF:
 #   [1] https://github.com/elo-enterprises/k8s-tools#makefilecomposemk
@@ -23,174 +23,70 @@ SHELL := bash
 MAKEFLAGS += -s --warn-undefined-variables
 .SHELLFLAGS := -euo pipefail -c
 THIS_MAKEFILE := $(abspath $(firstword $(MAKEFILE_LIST)))
-THIS_MAKEFILE := `python -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' ${THIS_MAKEFILE}`
-
 SRC_ROOT := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
 PROJECT_ROOT := $(shell dirname ${THIS_MAKEFILE})
 export SRC_ROOT PROJECT_ROOT
 
+# Override k8s-tools.yml service-defaults, 
+# explicitly setting the k3d version used
+export ALPINE_K8S_VERSION:=alpine/k8s:1.27.13
+export K3D_VERSION:=v5.6.0
+export KREW_PLUGINS=iexec popeye ktop doctor
+
 # k3d cluster defaults, merged with whatever is in CLUSTER_CONFIG
 export CLUSTER_NAME?=faas
-export CLUSTER_AGENT_COUNT?=12
 export CLUSTER_CONFIG?=faas.cluster.k3d.yaml
 
 # always use a local profile, ignoring whatever is in the parent environment
 export KUBECONFIG:=./${CLUSTER_NAME}.profile.yaml
+_:=$(shell umask 066;touch ${KUBECONFIG})
 
-
-# Creates dynamic targets from compose services (See REF[1])
-include Makefile.compose.mk
-$(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/k8s-tools.yml))
-$(eval $(call compose.import, ▰, ↪, TRUE, ${PROJECT_ROOT}/docker-compose.yml))
-
-# END: Data & Macros
-####################################################################################
-# BEGIN: Top-level:: These are the main entrypoints that you probably want.
-
-project.show: ▰/base/show
-↪show:
-	@#
-	echo CLUSTER_NAME=$${CLUSTER_NAME}
-	echo KUBECONFIG=$${KUBECONFIG}
-	kubectl cluster-info
-	kubectl get nodes
-	kubectl get namespace
-
-clean: this_cluster.clean compose.clean
-bootstrap: docker.init compose.init this_cluster.bootstrap project.show
-
-deploy: deploy.infra deploy.apps
-deploy.infra: fission_infra.setup knative_infra.setup argo_infra.setup
-deploy.apps: fission_app.setup knative_app.setup
-
-test: fission_infra.test fission_app.test knative_infra.test knative_app.test
-
-# END: Top-level
-####################################################################################
-# BEGIN: Cluster-ops:: These targets use the `k3d` container
-
-this_cluster.bootstrap: ▰/k3d/this_cluster.setup ▰/k3d/this_cluster.auth
-this_cluster.clean: ▰/k3d/this_cluster.clean
-↪this_cluster.clean:
-	k3d cluster delete $${CLUSTER_NAME}
-↪this_cluster.setup:
-	(k3d cluster list | grep $${CLUSTER_NAME} ) \
-	|| k3d cluster create \
-		--config $${CLUSTER_CONFIG} \
-		--api-port 6551 --servers 1 \
-		--agents $${CLUSTER_AGENT_COUNT} \
-		--port 8080:80@loadbalancer \
-		--volume $(pwd)/:/$${CLUSTER_NAME}@all \
-		--wait
-↪this_cluster.auth:
-	rmdir $${KUBECONFIG} 2>/dev/null || rm -f $${KUBECONFIG}
-	k3d kubeconfig merge $${CLUSTER_NAME} --output $${KUBECONFIG}
-
-# END: Cluster-ops
-####################################################################################
-# BEGIN: Fission Infra/Apps :: 
-#   Infra uses `kubectl` container, but apps require the `fission` container for CLI
-#   - https://fission.io/docs/installation/
-#   - https://fission.io/docs/reference/fission-cli/fission_token_create/
-
-export FISSION_NAMESPACE?=fission
-fission_infra.setup: ▰/base/fission_infra.setup compose.wait/30 project.show
-fission_infra.teardown: ▰/base/fission_infra.teardown
-fission_infra.test: ▰/fission/fission_infra.test
-fission_infra.test: ▰/fission/fission_infra.test
-↪fission_infra.setup:
-	kubectl create -k "github.com/fission/fission/crds/v1?ref=v1.20.1" || true
-	kubectl create namespace $${FISSION_NAMESPACE}
-	kubectl config set-context --current --namespace=$${FISSION_NAMESPACE}
-	kubectl apply -f https://github.com/fission/fission/releases/download/v1.20.1/fission-all-v1.20.1-minikube.yaml
-	kubectl config set-context --current --namespace=default
-↪fission_infra.teardown: 
-	namespace=$${FISSION_NAMESPACE} make k8s.namespace.purge 
-↪fission_infra.test: #fission_infra.auth
-	fission version && echo "----------------------"
-	fission check && echo "----------------------"
-
-# FIXME: 
-# ↪fission_infra.auth: $(eval $(call FISSION_AUTH_TOKEN))
-# define FISSION_AUTH_TOKEN
-# FISSION_AUTH_TOKEN=`\
-# 		kubectl get secrets -n $${FISSION_NAMESPACE} -o json \
-# 		| jq -r '.items[]|select(.metadata.name|startswith("fission-router")).data.token' \
-# 		| base64 -d`
-# endef
-
-
-fission_app.setup: fission_infra.test
-fission_app.setup: ▰/fission/fission_app.deploy
-fission_app.setup: compose.wait/35 fission_app.test
-fission_app.test: ▰/fission/fission_app.test
-↪fission_app.deploy:
-	( fission env list | grep fission/python-env ) \
-		|| fission env create --name python --image fission/python-env
-↪fission_app.test:
-	@#
-	(fission function list | grep fission-app) \
-		|| fission function create --name fission-app --env python --code src/fission/app.py \
-	&& fission function test --timeout=0 --name fission-app
-
-# END: Fission infra/apps
-####################################################################################
-# BEGIN: Knative Infra / Apps ::
-#   Dispatching to `kubectl` container and `kn` container for the the `kn` and `func` CLI
-#   - https://knative.run/article/How_to_deploy_a_Knative_function_on_Kubernetes.html
-#   - https://knative.dev/docs/getting-started/first-service/
-#   - https://knative.dev/docs/samples/
+# NB: `FUNCTION_NAMESPACE` only used in older versions of fission?
+# NB: `FISSION_CLI_VERSION` is not DRY with k8s-tools/fission container 
 export KNATIVE_NAMESPACE_PREFIX := knative-
-knative_infra.setup: ▰/base/knative_infra.setup
-knative_infra.test: ▰/kn/knative_infra.test
-knative_infra.teardown: ▰/base/knative_infra.teardown
-↪knative_infra.setup:
-	kubectl create -f https://github.com/knative/operator/releases/download/knative-v1.5.1/operator-post-install.yaml || true
-	kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.14.0/operator.yaml || true
-	make ↪knative_infra.serving
-↪knative_infra.serving:
-	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-crds.yaml
-	kubectl apply --validate=false -f https://github.com/knative/serving/releases/download/v0.25.0/serving-core.yaml
-↪knative_infra.auth:
-	echo knative_infra.auth placeholder
-↪knative_infra.test:
-	func version
-	kn version
-	kubectl get pods --namespace knative-serving
-	cd src/knf/; tree
-↪knative_infra.teardown: 
-	make k8s.namespace.list \
-	| grep $${KNATIVE_NAMESPACE_PREFIX} \
-	| xargs -n1 -I% bash -x -c "namespace=% make k8s.namespace.purge"
-
-knative_app.test: ▰/kn/knative_app.test
-knative_app.setup: ▰/kn/knative_app.setup
-↪knative_app.setup:
-	echo app-placeholder
-↪knative_app.test:
-	echo test-placeholder
-
-# END: Knative infra/apps
-####################################################################################
-# BEGIN: shortcuts and aliases
-bash: compose.bash
-shell: k8s-tools/base/shell
-k9: k9s
-panic: docker.panic
-docs:
-	pynchon jinja render README.md.j2
-
-# END: shortcuts and aliases
-####################################################################################
-# https://argoproj.github.io/argo-events/quick_start/
+export KNS_VERSION:=v1.14.0
+export KNE_VERSION:=v1.14.1
+export FISSION_NAMESPACE?=fission
+export FUNCTION_NAMESPACE=fission
+export FISSION_CLI_VERSION?=v1.20.1
+# ARGO_CLI_VERSION?=
 export ARGO_NAMESPACE_PREFIX:=argo
-argo: argo_infra.teardown argo_infra.setup 
-argo_infra.setup: ▰/base/argo_infra.setup
-argo_infra.teardown: ▰/base/argo_infra.teardown
-↪argo_infra.teardown: 
-	make k8s.namespace.list 
-↪argo_infra.setup:
-	helm repo list |grep $${ARGO_NAMESPACE_PREFIX} || helm repo add argo https://argoproj.github.io/argo-helm
-	helm install argo-events argo/argo-events -n $${ARGO_NAMESPACE_PREFIX}-events --create-namespace
-	kubectl apply -n argo-events \
-		-f https://raw.githubusercontent.com/argoproj/argo-events/stable/examples/eventbus/native.yaml
+export ARGO_WF_VERSION?=v3.5.4
+export ARGO_EVENTS_URL:=https://raw.githubusercontent.com/argoproj/argo-events
+
+# Creates dynamic targets from compose services 
+# (See the docs at https://github.com/elo-enterprises/k8s-tools/)
+include automation/Makefile.k8s.mk
+include automation/Makefile.compose.mk
+$(eval $(call compose.import, ▰, TRUE, ${PROJECT_ROOT}/k8s-tools.yml))
+
+# setupdown/teardown automation for supported FaaS platforms
+include automation/Makefile.argo.mk
+include automation/Makefile.knative.mk
+include automation/Makefile.fission.mk
+include automation/Makefile.prometheus.mk
+include automation/Makefile.cluster.mk
+
+#
+clean: k8s-tools/__clean__ cluster.clean
+init: docker.init
+build: k8s-tools/__build__
+	@# Only for dev & cache-busting (containers are pulled when they change)
+bootstrap: cluster.bootstrap cluster.stat
+deploy: deploy.infra deploy.apps
+deploy.infra: prometheus.infra.setup argo.infra.setup fission.infra.setup cluster.wait
+deploy.apps: argo.app.setup fission.app.setup cluster.wait
+test: argo.test fission.test prometheus.test
+
+
+bash: io.bash
+shell: k8s-tools/k8s/shell
+k9: k9s
+panic: k3d.panic kubefwd.panic #docker.panic
+docs: 
+	pynchon jinja render README.md.j2 \
+	 && pynchon markdown preview README.md
+ps: k3d.ps kubefwd.ps
+	@#
+top:
+	cmd=ktop entrypoint=kubectl make k8s
