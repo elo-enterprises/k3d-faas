@@ -3,7 +3,8 @@ prometheus: prometheus.setup
 
 prometheus.wait: k8s.namespace.wait/prometheus
 
-prometheus.setup: \
+prometheus.setup: prometheus.infra.setup
+prometheus.infra.setup: \
 	▰/k8s/self.prometheus.setup \
 	prometheus.fwd 
 

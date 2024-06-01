@@ -2,6 +2,8 @@ cluster.shell: k8s.shell/default/test-harness
 cluster.clean: ▰/k3d/k3d.cluster.delete/$${CLUSTER_NAME}
 cluster.test: ▰/k3d/self.cluster.test
 cluster.wait: ▰/k8s/k8s.pods.wait_until_ready
+
+cluster.stat: ▰/k8s/k8s.stat
 cluster.bootstrap: \
 	▰/k3d/self.registries.setup \
 	▰/k3d/self.cluster.setup \

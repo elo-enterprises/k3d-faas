@@ -66,26 +66,26 @@ include automation/Makefile.fission.mk
 include automation/Makefile.prometheus.mk
 include automation/Makefile.cluster.mk
 
+#
+clean: k8s-tools/__clean__ cluster.clean
+init: docker.init
 build: k8s-tools/__build__
 	@# Only for dev & cache-busting (containers are pulled when they change)
+bootstrap: cluster.bootstrap cluster.stat
+deploy: deploy.infra deploy.apps
+deploy.infra: prometheus.infra.setup argo.infra.setup fission.infra.setup cluster.wait
+deploy.apps: argo.app.setup fission.app.setup cluster.wait
+test: argo.test fission.test prometheus.test
 
-top:
-	cmd=ktop entrypoint=kubectl make k8s
-
-ps: k3d.ps kubefwd.ps
-	@#
-
-cluster.stat: ▰/k8s/k8s.stat
-
-clean: k8s-tools/__clean__ cluster.clean
-bootstrap: docker.init cluster.bootstrap cluster.stat
-
-test: argo.test fission.test 
 
 bash: io.bash
 shell: k8s-tools/k8s/shell
 k9: k9s
-panic: docker.panic
+panic: k3d.panic kubefwd.panic #docker.panic
 docs: 
 	pynchon jinja render README.md.j2 \
 	 && pynchon markdown preview README.md
+ps: k3d.ps kubefwd.ps
+	@#
+top:
+	cmd=ktop entrypoint=kubectl make k8s

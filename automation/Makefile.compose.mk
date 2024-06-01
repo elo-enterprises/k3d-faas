@@ -168,7 +168,8 @@ ${compose_file_stem}/__up__:
 	docker compose -f $${compose_file} up
 ${compose_file_stem}/__clean__:
 	set -x && docker compose -f $${compose_file} --progress quiet down -t 1 --remove-orphans
-
+${compose_file_stem}.clean: ${compose_file_stem}/__clean__
+${compose_file_stem}.build: ${compose_file_stem}/__build__
 ${compose_file_stem}/%:
 	@$$(eval export svc_name:=$$(shell echo $$@|awk -F/ '{print $$$$2}'))
 	@$$(eval export cmd:=$(shell echo $${cmd:-}))
